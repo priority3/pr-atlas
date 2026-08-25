@@ -1,0 +1,21 @@
+{
+  "name": "@pr-lore/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "lore": "./src/main.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/**/*.test.ts",
+    "lore": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@pr-lore/connectors": "workspace:*",
+    "@pr-lore/core": "workspace:*",
+    "@pr-lore/schema": "workspace:*"
+  }
+}
+
