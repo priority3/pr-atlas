@@ -5,12 +5,27 @@ import {
   type ConnectorManifest,
   type ConnectorResult,
   type JsonValue,
+  type LoreCapture,
   type LoreConnector,
   type PrivacyLevel,
 } from '@pr-lore/schema'
+import { mapWithConcurrency } from '../shared/pool.js'
+import { parseFrontmatter } from './frontmatter.js'
+import {
+  GitHubClient,
+  encodePath,
+  githubBlobUrl,
+  githubHeaders,
+  parseGitHubRepository,
+  type GitHubRepository,
+  type GitHubTreeEntry,
+} from './github.js'
 
 const DEFAULT_CONTENT_DIR = 'src/content/blogs'
-const GITHUB_API = 'https://api.github.com'
+
+// Reason: GitHub bills one request per blob. Four at a time keeps a large blog
+// responsive without burning through the rate limit in a burst.
+const BLOB_CONCURRENCY = 4
 
 export interface PriorityMeBlogConfig {
   repository_url: string
@@ -24,33 +39,10 @@ export interface PriorityMeBlogConfig {
   allow_cloud_llm?: boolean
 }
 
-interface GitHubRepository {
-  owner: string
-  repo: string
-  branchFromUrl: string | null
-  contentDirFromUrl: string | null
-}
-
-interface GitHubTreeEntry {
-  path: string
-  type: string
-  sha: string
-  url: string
-}
-
-interface GitHubTreeResponse {
-  sha?: string
-  truncated?: boolean
-  tree?: GitHubTreeEntry[]
-}
-
-interface GitHubRepositoryResponse {
-  default_branch?: string
-}
-
-interface GitHubBlobResponse {
-  content?: string
-  encoding?: string
+/** Per-file state carried between runs so unchanged blobs are never refetched. */
+interface Checkpoint {
+  treeSha: string | null
+  files: Record<string, string>
 }
 
 const manifest: ConnectorManifest = {
@@ -64,6 +56,7 @@ const manifest: ConnectorManifest = {
   config_schema: {
     type: 'object',
     required: ['repository_url'],
+    additionalProperties: false,
     properties: {
       repository_url: {
         type: 'string',
@@ -94,21 +87,21 @@ export function createPriorityMeBlogConnector(): LoreConnector {
     async collect(context: ConnectorContext): Promise<ConnectorResult> {
       const config = parseConfig(context.instance.config)
       const repository = parseGitHubRepository(config.repository_url)
-      const headers = githubHeaders(config.token_env)
-      const repositoryInfo = await fetchJson<GitHubRepositoryResponse>(
-        `${GITHUB_API}/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}`,
-        headers,
-      )
-      const ref = cleanString(config.branch) ?? repository.branchFromUrl ?? repositoryInfo.default_branch
+      const client = new GitHubClient(githubHeaders(config.token_env))
+
+      // Reason: resolving the default branch costs a request, so it is only
+      // fetched when neither the config nor the URL names a ref.
+      const ref =
+        cleanString(config.branch) ??
+        repository.branchFromUrl ??
+        (await client.defaultBranch(repository))
       if (!ref) throw new Error('GitHub repository does not expose a default branch; set config.branch')
 
       const contentDir = normalizeContentDir(
         cleanString(config.content_dir) ?? repository.contentDirFromUrl ?? DEFAULT_CONTENT_DIR,
       )
-      const tree = await fetchJson<GitHubTreeResponse>(
-        `${GITHUB_API}/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}/git/trees/${encodeURIComponent(ref)}?recursive=1`,
-        headers,
-      )
+
+      const tree = await client.tree(repository, ref)
       if (tree.truncated) {
         throw new Error('GitHub repository tree is truncated; narrow config.content_dir before collecting')
       }
@@ -117,90 +110,154 @@ export function createPriorityMeBlogConnector(): LoreConnector {
         .filter(entry => entry.type === 'blob' && isMarkdown(entry.path))
         .filter(entry => isWithinDirectory(entry.path, contentDir))
         .sort((a, b) => a.path.localeCompare(b.path))
-      const captures = []
 
-      for (const file of files) {
-        const raw = await fetchGitHubBlob(file.url, headers)
-        const parsed = parseFrontmatter(raw)
-        const slug = slugifyPath(file.path.slice(contentDir.length + 1).replace(/\.(md|mdoc)$/i, ''))
-        const sourceName = cleanString(config.source_name) ?? 'priority.me'
-        const blobUrl = githubBlobUrl(repository, ref, file.path)
-        const uri = `github://${repository.owner}/${repository.repo}/${file.path}?ref=${encodeURIComponent(ref)}`
-        const contentHash = hashText(raw)
-        const title = stringValue(parsed.data.title) || slug
-        const siteUrl = trimTrailingSlash(config.site_url)
-        const articleUrl = siteUrl ? `${siteUrl}/posts/${encodePath(slug)}` : null
+      const treeSha = tree.sha ?? null
+      const previous = readCheckpoint(context.instance.checkpoint, ref, contentDir)
+      const checkpoint = buildCheckpoint(repository, ref, treeSha, contentDir, files, context.now)
 
-        captures.push({
-          schema_version: 'lore.capture.v1' as const,
-          id: stableId(
-            'cap',
-            JSON.stringify({ connector: manifest.id, instance: context.instance.id, uri, contentHash }),
-          ),
-          connector: manifest.id,
-          instance_id: context.instance.id,
-          run_id: context.run_id,
-          observed_at: context.now,
-          captured_at: context.now,
-          subject: {
-            kind: 'document' as const,
-            uri,
-            title,
-            url: articleUrl ?? blobUrl,
-          },
-          payload: {
-            kind: 'markdown' as const,
-            text: parsed.body,
-            raw_ref: blobUrl,
-            content_hash: contentHash,
-            mime_type: 'text/markdown',
-          },
-          note: null,
-          tags: collectTags(parsed.data),
-          metadata: {
-            collection: 'blogs',
-            path: file.path,
-            source_name: sourceName,
-            repository: `https://github.com/${repository.owner}/${repository.repo}`,
-            ref,
-            blob_sha: file.sha,
-            source_url: blobUrl,
-            frontmatter: parsed.data,
-          },
-          privacy: {
-            level: config.privacy_level ?? 'private',
-            allow_cloud_llm: config.allow_cloud_llm ?? false,
-          },
-          provenance: {
-            trigger: context.trigger,
-            connector_version: `${manifest.id}@${manifest.version}`,
-            cursor: file.sha,
-          },
-        })
+      // Fast path: an identical tree SHA means nothing under the repository
+      // changed, so every blob request can be skipped.
+      if (previous?.treeSha && treeSha && previous.treeSha === treeSha) {
+        return { captures: [], checkpoint: { ...checkpoint, changed: 0 } }
       }
 
-      return {
-        captures,
-        checkpoint: {
-          scanned_at: context.now,
-          repository: `https://github.com/${repository.owner}/${repository.repo}`,
-          ref,
-          tree_sha: tree.sha ?? null,
-          content_dir: contentDir,
-          files: files.length,
-        },
-      }
+      const changed = previous
+        ? files.filter(file => previous.files[file.path] !== file.sha)
+        : files
+
+      const captures = await mapWithConcurrency(changed, BLOB_CONCURRENCY, async file => {
+        const raw = await client.blobText(file.url)
+        return toCapture({ context, config, repository, ref, contentDir, file, raw })
+      })
+
+      return { captures, checkpoint: { ...checkpoint, changed: changed.length } }
     },
   }
 }
 
+interface CaptureInput {
+  context: ConnectorContext
+  config: PriorityMeBlogConfig
+  repository: GitHubRepository
+  ref: string
+  contentDir: string
+  file: GitHubTreeEntry
+  raw: string
+}
+
+function toCapture(input: CaptureInput): LoreCapture {
+  const { context, config, repository, ref, contentDir, file, raw } = input
+  const parsed = parseFrontmatter(raw)
+  const slug = slugifyPath(file.path.slice(contentDir.length + 1).replace(/\.(md|mdoc)$/i, ''))
+  const blobUrl = githubBlobUrl(repository, ref, file.path)
+  const uri = `github://${repository.owner}/${repository.repo}/${file.path}?ref=${encodeURIComponent(ref)}`
+  const contentHash = hashText(raw)
+  const siteUrl = trimTrailingSlash(config.site_url)
+  const articleUrl = siteUrl ? `${siteUrl}/posts/${encodePath(slug)}` : null
+
+  return {
+    schema_version: 'lore.capture.v1',
+    id: stableId(
+      'cap',
+      JSON.stringify({ connector: manifest.id, instance: context.instance.id, uri, contentHash }),
+    ),
+    connector: manifest.id,
+    instance_id: context.instance.id,
+    run_id: context.run_id,
+    observed_at: context.now,
+    captured_at: context.now,
+    subject: {
+      kind: 'document',
+      uri,
+      title: stringValue(parsed.data.title) ?? slug,
+      url: articleUrl ?? blobUrl,
+    },
+    payload: {
+      kind: 'markdown',
+      text: parsed.body,
+      raw_ref: blobUrl,
+      content_hash: contentHash,
+      mime_type: 'text/markdown',
+    },
+    note: null,
+    tags: collectTags(parsed.data),
+    metadata: {
+      collection: 'blogs',
+      path: file.path,
+      source_name: cleanString(config.source_name) ?? 'priority.me',
+      repository: repositoryUrl(repository),
+      ref,
+      blob_sha: file.sha,
+      source_url: blobUrl,
+      frontmatter: parsed.data,
+    },
+    privacy: {
+      level: config.privacy_level ?? 'private',
+      allow_cloud_llm: config.allow_cloud_llm ?? false,
+    },
+    provenance: {
+      trigger: context.trigger,
+      connector_version: `${manifest.id}@${manifest.version}`,
+      cursor: file.sha,
+    },
+  }
+}
+
+function buildCheckpoint(
+  repository: GitHubRepository,
+  ref: string,
+  treeSha: string | null,
+  contentDir: string,
+  files: GitHubTreeEntry[],
+  now: string,
+): Record<string, JsonValue> {
+  return {
+    scanned_at: now,
+    repository: repositoryUrl(repository),
+    ref,
+    tree_sha: treeSha,
+    content_dir: contentDir,
+    file_count: files.length,
+    files: Object.fromEntries(files.map(file => [file.path, file.sha])),
+  }
+}
+
+/**
+ * Reads prior per-file state, returning null whenever a full scan is required.
+ *
+ * A checkpoint from a different ref or content directory describes a different
+ * set of files, and builds before per-file tracking stored `files` as a count,
+ * which carries no usable state.
+ */
+function readCheckpoint(
+  value: Record<string, JsonValue> | null,
+  ref: string,
+  contentDir: string,
+): Checkpoint | null {
+  if (!value) return null
+  if (value.ref !== ref || value.content_dir !== contentDir) return null
+
+  const files = value.files
+  if (!files || typeof files !== 'object' || Array.isArray(files)) return null
+
+  const tracked: Record<string, string> = {}
+  for (const [path, sha] of Object.entries(files)) {
+    if (typeof sha === 'string') tracked[path] = sha
+  }
+
+  return {
+    treeSha: typeof value.tree_sha === 'string' ? value.tree_sha : null,
+    files: tracked,
+  }
+}
+
 function parseConfig(value: Record<string, JsonValue>): PriorityMeBlogConfig {
-  const repositoryUrl = value.repository_url
-  if (typeof repositoryUrl !== 'string' || !repositoryUrl.trim()) {
+  const repositoryUrlValue = value.repository_url
+  if (typeof repositoryUrlValue !== 'string' || !repositoryUrlValue.trim()) {
     throw new Error('priority-me-blog requires config.repository_url')
   }
 
-  const config: PriorityMeBlogConfig = { repository_url: repositoryUrl.trim() }
+  const config: PriorityMeBlogConfig = { repository_url: repositoryUrlValue.trim() }
   const branch = value.branch
   const contentDir = value.content_dir
   const siteUrl = value.site_url
@@ -220,79 +277,8 @@ function parseConfig(value: Record<string, JsonValue>): PriorityMeBlogConfig {
   return config
 }
 
-function parseGitHubRepository(value: string): GitHubRepository {
-  let url: URL
-  try {
-    url = new URL(value)
-  } catch {
-    throw new Error('priority-me-blog repository_url must be a valid GitHub URL')
-  }
-  if (url.protocol !== 'https:' || !['github.com', 'www.github.com'].includes(url.hostname)) {
-    throw new Error('priority-me-blog repository_url must point to github.com')
-  }
-
-  const parts = url.pathname
-    .split('/')
-    .filter(Boolean)
-    .map(part => decodeURIComponent(part))
-  if (parts.length < 2) throw new Error('GitHub repository_url must include owner and repository')
-  const owner = parts[0]
-  const repo = parts[1]?.replace(/\.git$/i, '')
-  if (!owner || !repo) throw new Error('GitHub repository_url must include owner and repository')
-  if (parts[2] && parts[2] !== 'tree') {
-    throw new Error('GitHub repository_url must point to a repository or tree URL')
-  }
-
-  let branchFromUrl: string | null = null
-  let contentDirFromUrl: string | null = null
-  if (parts[2] === 'tree' && parts[3]) {
-    branchFromUrl = parts[3]
-    const path = parts.slice(4).join('/')
-    contentDirFromUrl = path || null
-  }
-  return { owner, repo, branchFromUrl, contentDirFromUrl }
-}
-
-function githubHeaders(tokenEnv: string | undefined): Record<string, string> {
-  const headers: Record<string, string> = {
-    Accept: 'application/vnd.github+json',
-    'User-Agent': 'pr-lore/0.1.0',
-  }
-  const token = tokenEnv ? process.env[tokenEnv]?.trim() : undefined
-  if (token) headers.Authorization = `Bearer ${token}`
-  return headers
-}
-
-async function fetchJson<T>(url: string, headers: Record<string, string>): Promise<T> {
-  const response = await fetch(url, {
-    headers,
-    signal: AbortSignal.timeout(20_000),
-  })
-  const body = await response.text()
-  if (!response.ok) {
-    throw new Error(`GitHub request failed: HTTP ${response.status} ${url}`)
-  }
-  try {
-    return JSON.parse(body) as T
-  } catch {
-    throw new Error(`GitHub request returned invalid JSON: ${url}`)
-  }
-}
-
-async function fetchGitHubBlob(url: string, headers: Record<string, string>): Promise<string> {
-  const body = await fetchJson<GitHubBlobResponse>(url, headers)
-  if (body.encoding !== 'base64' || typeof body.content !== 'string') {
-    throw new Error(`GitHub blob response is not base64: ${url}`)
-  }
-  return Buffer.from(body.content.replace(/\s/g, ''), 'base64').toString('utf8')
-}
-
-function githubBlobUrl(repository: GitHubRepository, ref: string, path: string): string {
-  return `https://github.com/${repository.owner}/${repository.repo}/blob/${encodePath(ref)}/${encodePath(path)}`
-}
-
-function encodePath(value: string): string {
-  return value.split('/').map(segment => encodeURIComponent(segment)).join('/')
+function repositoryUrl(repository: GitHubRepository): string {
+  return `https://github.com/${repository.owner}/${repository.repo}`
 }
 
 function normalizeContentDir(value: string): string {
@@ -311,51 +297,18 @@ function isMarkdown(file: string): boolean {
   return /\.(md|mdoc)$/i.test(file)
 }
 
-function parseFrontmatter(raw: string): {
-  data: Record<string, JsonValue>
-  body: string
-} {
-  const match = raw.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n?([\s\S]*)$/)
-  if (!match) return { data: {}, body: raw.trim() }
-
-  const data: Record<string, JsonValue> = {}
-  for (const line of (match[1] ?? '').split(/\r?\n/)) {
-    const separator = line.indexOf(':')
-    if (separator < 1) continue
-    const key = line.slice(0, separator).trim()
-    const value = line.slice(separator + 1).trim()
-    if (!key) continue
-    data[key] = parseScalar(value)
-  }
-  return { data, body: (match[2] ?? '').trim() }
-}
-
-function parseScalar(value: string): JsonValue {
-  if (!value) return null
-  const unquoted = value.replace(/^("|')([\s\S]*)\1$/, '$2')
-  if (unquoted === 'true') return true
-  if (unquoted === 'false') return false
-  if (/^-?\d+(\.\d+)?$/.test(unquoted)) return Number(unquoted)
-  if (unquoted.startsWith('[') && unquoted.endsWith(']')) {
-    return unquoted
-      .slice(1, -1)
-      .split(',')
-      .map(item => item.trim().replace(/^("|')([\s\S]*)\1$/, '$2'))
-      .filter(Boolean)
-  }
-  return unquoted
-}
-
 function stringValue(value: JsonValue | undefined): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
 function collectTags(data: Record<string, JsonValue>): string[] {
   const values: string[] = []
-  const tag = data.tag
-  const tags = data.tags
-  if (typeof tag === 'string') values.push(tag)
-  if (Array.isArray(tags)) values.push(...tags.filter((item): item is string => typeof item === 'string'))
+  for (const candidate of [data.tag, data.tags]) {
+    if (typeof candidate === 'string') values.push(candidate)
+    else if (Array.isArray(candidate)) {
+      values.push(...candidate.filter((item): item is string => typeof item === 'string'))
+    }
+  }
   return [...new Set(values.map(value => value.trim()).filter(Boolean))]
 }
 

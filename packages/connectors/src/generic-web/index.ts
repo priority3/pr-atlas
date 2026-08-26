@@ -8,6 +8,9 @@ import {
   type LoreConnector,
   type PrivacyLevel,
 } from '@pr-lore/schema'
+import { describeNetworkFailure } from '../shared/http.js'
+
+const REQUEST_TIMEOUT_MS = 20_000
 
 export interface GenericWebConfig {
   url: string
@@ -29,6 +32,7 @@ const manifest: ConnectorManifest = {
   config_schema: {
     type: 'object',
     required: ['url'],
+    additionalProperties: false,
     properties: {
       url: { type: 'string', format: 'uri' },
       title: { type: 'string' },
@@ -44,20 +48,24 @@ export function createGenericWebConnector(): LoreConnector {
   return {
     manifest: () => manifest,
     async collect(context: ConnectorContext): Promise<ConnectorResult> {
-      const config = context.instance.config as unknown as GenericWebConfig
-      const url = requireUrl(config.url)
-      const response = await fetch(url, {
-        headers: { Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1' },
-        signal: AbortSignal.timeout(20_000),
-      })
-      if (!response.ok) throw new Error(`Web capture failed: HTTP ${response.status}`)
+      const config = parseConfig(context.instance.config)
+      const url = config.url
+      let response: Response
+      try {
+        response = await fetch(url, {
+          headers: { Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1' },
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        })
+      } catch (error) {
+        throw describeNetworkFailure(error, url, REQUEST_TIMEOUT_MS, new URL(url).host)
+      }
+      if (!response.ok) throw new Error(`Web capture failed: HTTP ${response.status} ${url}`)
 
       const html = await response.text()
-      const title = config.title?.trim() || extractTitle(html) || url
+      const title = config.title ?? extractTitle(html) ?? url
       const text = extractText(html)
       const contentHash = hashText(html)
       const uri = canonicalUrl(url)
-      const privacyLevel = normalizePrivacyLevel(config.privacy_level)
       const captureId = stableId(
         'cap',
         JSON.stringify({ connector: manifest.id, instance: context.instance.id, uri, contentHash }),
@@ -86,14 +94,14 @@ export function createGenericWebConnector(): LoreConnector {
               content_hash: contentHash,
               mime_type: response.headers.get('content-type'),
             },
-            note: config.note?.trim() || null,
-            tags: [...new Set((config.tags ?? []).map(tag => tag.trim()).filter(Boolean))],
+            note: config.note ?? null,
+            tags: config.tags ?? [],
             metadata: {
               status: response.status,
               content_length: html.length,
             } satisfies Record<string, JsonValue>,
             privacy: {
-              level: privacyLevel,
+              level: config.privacy_level ?? 'private',
               allow_cloud_llm: config.allow_cloud_llm ?? false,
             },
             provenance: {
@@ -109,15 +117,43 @@ export function createGenericWebConnector(): LoreConnector {
   }
 }
 
-function normalizePrivacyLevel(value: PrivacyLevel | undefined): PrivacyLevel {
-  return value === 'public' || value === 'sensitive' ? value : 'private'
-}
-
-function requireUrl(value: unknown): string {
-  if (typeof value !== 'string' || !/^https?:\/\//i.test(value)) {
-    throw new Error('generic-web requires an http(s) URL')
+/**
+ * Narrows loosely-typed instance config into `GenericWebConfig`.
+ *
+ * Mirrors the field-by-field style used by `priority-me-blog`: the manifest
+ * schema is validated by the runtime before `collect` runs, but a connector
+ * must not depend on that to stay type-honest about its own input.
+ */
+function parseConfig(value: Record<string, JsonValue>): GenericWebConfig {
+  const url = value.url
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url.trim())) {
+    throw new Error('generic-web requires an http(s) config.url')
   }
-  return value
+
+  const config: GenericWebConfig = { url: url.trim() }
+  const title = value.title
+  const note = value.note
+  const tags = value.tags
+  const privacyLevel = value.privacy_level
+  const allowCloudLlm = value.allow_cloud_llm
+
+  if (typeof title === 'string' && title.trim()) config.title = title.trim()
+  if (typeof note === 'string' && note.trim()) config.note = note.trim()
+  if (Array.isArray(tags)) {
+    config.tags = [
+      ...new Set(
+        tags
+          .filter((tag): tag is string => typeof tag === 'string')
+          .map(tag => tag.trim())
+          .filter(Boolean),
+      ),
+    ]
+  }
+  if (privacyLevel === 'public' || privacyLevel === 'private' || privacyLevel === 'sensitive') {
+    config.privacy_level = privacyLevel
+  }
+  if (typeof allowCloudLlm === 'boolean') config.allow_cloud_llm = allowCloudLlm
+  return config
 }
 
 function canonicalUrl(value: string): string {

@@ -1,17 +1,32 @@
 {
   "name": "@pr-lore/connectors",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./generic-web": "./src/generic-web/index.ts",
-    "./priority-me-blog": "./src/priority-me-blog/index.ts"
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./generic-web": {
+      "development": "./src/generic-web/index.ts",
+      "types": "./dist/generic-web/index.d.ts",
+      "default": "./dist/generic-web/index.js"
+    },
+    "./priority-me-blog": {
+      "development": "./src/priority-me-blog/index.ts",
+      "types": "./dist/priority-me-blog/index.d.ts",
+      "default": "./dist/priority-me-blog/index.js"
+    }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc --noEmit",
-    "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/**/*.test.ts"
+    "build": "tsc -b",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
+    "test": "tsx --conditions=development --test test/**/*.test.ts"
   },
   "dependencies": {
     "@pr-lore/schema": "workspace:*"

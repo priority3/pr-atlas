@@ -1,0 +1,15 @@
+{
+  "//": "Type-checks sources and tests together. `customConditions` resolves workspace packages through their `development` export to src, so checking never requires a prior build. `rootDir` is widened because tests live outside src.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true,
+    "rootDir": ".",
+    "customConditions": ["development"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "references": []
+}

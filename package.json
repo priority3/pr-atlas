@@ -1,7 +1,7 @@
 {
   "name": "pr-lore",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A connector-driven personal memory collection runtime.",
   "packageManager": "pnpm@11.19.0",
   "engines": {
@@ -9,9 +9,11 @@
   },
   "scripts": {
     "build": "pnpm -r build",
+    "clean": "rm -rf packages/*/dist apps/*/dist",
+    "rebuild": "pnpm clean && pnpm build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "lore": "pnpm --silent --filter @pr-lore/cli exec tsx src/main.ts"
+    "lore": "pnpm --silent --filter @pr-lore/cli exec tsx --conditions=development src/main.ts"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

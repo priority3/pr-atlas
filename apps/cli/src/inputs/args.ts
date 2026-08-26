@@ -9,7 +9,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
   const options = new Map<string, string[]>()
   const flags = new Set<string>()
   let parseOptions = true
-  const booleanOptions = new Set(['disabled', 'help', 'save'])
+  // Reason: these never take a value, so a following bare word is a positional
+  // rather than this option's argument (`--full priority-me-blog`).
+  const booleanOptions = new Set(['disabled', 'help', 'save', 'full'])
 
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index]

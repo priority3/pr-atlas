@@ -19,19 +19,22 @@ Connector Instance -- schedule / checkpoint / config
   LoreCapture (lore.capture.v1)
         |
         v
-  Local Outbox (.lore/outbox)
+  Local Outbox (.lore/outbox/{pending,sent,failed})
         |
-        +--> future sync service / review UI / LLM index
+        v
+  Deliverer -- lore sync
+        |
+        +--> file export / webhook / future review UI / LLM index
 ```
 
 仓库分层：
 
 | 目录 | 职责 |
 | --- | --- |
-| `packages/schema` | `LoreCapture`、Connector manifest/context/result、稳定 ID 和 schema 基础校验 |
-| `packages/core` | Connector registry、运行上下文、手动 capture、文件型 outbox |
+| `packages/schema` | `LoreCapture`、Connector manifest/context/result、稳定 ID、capture 与 instance 校验、`config_schema` 的 JSON Schema 子集校验器 |
+| `packages/core` | Connector registry、运行上下文、手动 capture、状态目录型 outbox、Deliverer 与 `syncOutbox` |
 | `packages/connectors` | 内置内容源。当前包含 `generic-web` 和 `priority-me-blog` |
-| `apps/cli` | `lore` 命令、实例配置、触发 Connector、把结果写入 outbox |
+| `apps/cli` | `lore` 命令、实例与投递目标配置、触发 Connector、把结果写入 outbox 并投递 |
 
 Connector 是可插拔的采集能力；未来更宽泛的安装包能力可以叫 Extension，但当前协议只使用 Connector。
 
@@ -78,6 +81,49 @@ Connector 是可插拔的采集能力；未来更宽泛的安装包能力可以�
 
 `id` 对同一个 Connector 实例、来源 URI 和内容哈希保持稳定，因此 cron 重跑不会产生重复 outbox 条目。`observed_at` 记录本次观察时间，内容变化时哈希和 ID 都会变化。
 
+## 增量采集
+
+Connector 每次运行都会返回 checkpoint，下一次运行把它作为输入。声明了 `incremental` 能力的 Connector 必须真正使用它。
+
+`priority-me-blog` 的增量分三层：
+
+1. 仓库 tree SHA 与 checkpoint 一致 → 直接返回 0 条 capture，**跳过全部 blob 请求**。这是绝大多数定时运行的实际路径。
+2. tree 变了 → 逐文件比对 blob SHA，只拉取新增和变更的文件；未变的文件不产出 capture。
+3. checkpoint 的 `ref` 或 `content_dir` 与当前配置不符 → 视为无效，退回全量扫描。
+
+blob 请求以并发上限 4 并行，并保持输入顺序。未认证的 GitHub API 每小时只有 60 次配额；配额耗尽时错误信息会指出是配额问题而非鉴权问题，并说明该配 `token_env` 还是收窄 `content_dir`。
+
+要忽略 checkpoint 强制全量重采：
+
+```bash
+lore connector run priority-me-blog --instance priority --full
+```
+
+## 投递与同步
+
+outbox 里的条目通过 **Deliverer** 出站。状态由文件位置表示（`.lore/outbox/{pending,sent,failed}/`），所以计数是一次目录列举，状态流转是一次原子 rename。
+
+内置两种目标：
+
+```bash
+# 导出到本地目录
+lore target set local --kind file --config '{"directory":"./lore-export"}'
+
+# POST 到 HTTP 端点，token 只配环境变量名
+lore target set remote --kind webhook \
+  --config '{"url":"https://example.com/hook","token_env":"PR_LORE_SINK_TOKEN"}'
+
+lore target list
+lore target kinds     # 查看每种目标的 config schema
+lore sync --target local [--limit 20] [--id <capture-id>]
+```
+
+投递失败会把条目标为 `failed` 并累加 `attempts`，`lore retry` 可把它们改回 `pending`。
+
+**隐私默认 fail-closed**：`privacy.level` 为 `sensitive` 的 capture 不会投递到 webhook 目标，除非该目标显式声明 `include_privacy_levels`。被跳过的条目既不算成功也不算失败，保持 `pending`，并出现在 `lore sync` 输出的 `skipped` 字段里 —— 不静默丢弃。
+
+只配置了一个目标时 `--target` 可省略；配置了多个时必须显式指定。
+
 ## CLI
 
 安装依赖后，在仓库根目录运行：
@@ -108,6 +154,8 @@ lore config list
 
 `lore save --file capture.json` 可把一个 capture（或包含 `capture` 字段的 CLI 输出）放进 outbox；`lore retry` 会把失败条目重新置为 pending。
 
+`lore help` 列出全部命令。
+
 ## priority.me Blog Connector
 
 这个 Connector 的输入是 **GitHub 仓库地址**，不是本地目录，也不 import `priority.me` 的代码。它通过 GitHub API：
@@ -115,9 +163,24 @@ lore config list
 1. 读取仓库默认分支（或配置的 branch）。
 2. 获取递归 Git tree。
 3. 默认只筛选 `src/content/blogs` 下的 `.md` 和 `.mdoc`。
-4. 读取 blob，解析简单 YAML frontmatter，输出文章正文和来源信息。
+4. 读取 blob，解析 YAML frontmatter，输出文章正文和来源信息。
 
 因此 `src/content/leetcode` 会被排除。也可以直接传 GitHub tree 地址，例如 `https://github.com/owner/repo/tree/main/src/content/blogs`，此时会自动推断 branch 和目录。
+
+### frontmatter 支持范围
+
+解析器是零依赖的 YAML 子集实现，支持：
+
+- `key: value` 标量，含引号字符串、布尔、数字、`null` / `~`
+- 内联集合 `[a, b]` 与 `{a: 1}`
+- 块序列 `- item`（含同缩进写法），以及映射序列
+- 任意深度的嵌套映射
+- 块标量 `|` 与 `>`
+- `#` 注释（块标量内部的 `#` 视为正文）
+
+明确**不支持**并会直接报错的构造：tab 缩进、锚点与别名（`&x` / `*x`）、合并键（`<<:`）、复杂键（`? `）、多文档。
+
+这里的取舍是：宁可解析失败也不静默丢数据。此前的实现会跳过任何不认识的语法，一个缩进写法不同的 `tags:` 列表就会变成「没有 tags」而毫无提示。日期保持为字符串，因为 capture metadata 是 JSON。
 
 先写入一个 Connector instance：
 
@@ -199,12 +262,42 @@ export const connector: LoreConnector = {
 
 Connector 不应依赖 CLI、Blog 站点实现或用户 home 目录；所有输入都来自 `config`，所有输出都通过 `ConnectorResult` 返回。这样同一个 Connector 可以被 CLI、未来的 daemon、webhook 或测试夹具复用。
 
+`packages/connectors` 只依赖 `packages/schema`，不依赖 `packages/core`。这条边界是刻意维持的：Connector 不知道 registry、outbox 或 CLI 的存在，因此可以脱离运行时单独测试。
+
+### config_schema 会被真正执行
+
+manifest 里的 `config_schema` 不是文档，而是会被校验的契约。`runConnector` 在调用 `collect` 前校验 `instance.config`，`lore config set` 在写入前也校验一次 —— 前者是强制点（daemon、webhook 走同一条路），后者是为了让拼写错误在配置时就暴露：
+
+```bash
+$ lore config set bad --connector generic-web --config '{"urlx":"x"}'
+lore: Invalid config for connector generic-web:
+  - config.url is required
+  - config.urlx is not a recognized option (did you mean "url"?)
+```
+
+校验器是 JSON Schema 的一个子集（`type`、`required`、`properties`、`additionalProperties`、`items`、`enum`、`format: uri`、`minLength`、`minItems`），未知关键字会被忽略，因此 manifest 可以携带 `description`、`default` 这类纯文档字段。内置 Connector 都声明了 `additionalProperties: false`。
+
 ## 开发检查
 
 ```bash
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm rebuild    # clean + build，等价于 pnpm clean && pnpm build
 ```
 
-当前 `build` 使用 TypeScript `--noEmit` 做包级边界检查；后续发布时再接入 bundling 和签名安装流程。
+`pnpm build` 通过 TypeScript project references 逐包编译到 `dist/`，产出 `.js` + `.d.ts` + sourcemap，不引入任何打包器。构建完成后 CLI 可以脱离 `tsx` 直接运行：
+
+```bash
+pnpm build
+node apps/cli/dist/main.js help
+```
+
+各包的 `exports` 同时声明两个条件：
+
+- `development` → `src/*.ts`，开发与测试用 `tsx --conditions=development` 走这条，**无需先构建**；
+- `default` → `dist/*.js`，`node` 直接运行产物或将来发布时走这条。
+
+`typecheck` 用独立的 `tsconfig.typecheck.json`，通过 `customConditions: ["development"]` 直接对源码做检查（并覆盖 `src` 与 `test`），因此类型检查同样不依赖构建产物。
+
+四个包目前仍是 `private: true`。发布到 npm 是独立的决策，本次只把构建机制修正到「产物存在且可执行」。

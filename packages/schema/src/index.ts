@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto'
+import { isJsonValue, isPlainObject, type JsonValue } from './json.js'
 
-export type JsonPrimitive = string | number | boolean | null
-export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
+export { isJsonValue, isPlainObject } from './json.js'
+export type { JsonPrimitive, JsonValue } from './json.js'
+export { validateJsonSchema } from './json-schema.js'
 
 export type PrivacyLevel = 'public' | 'private' | 'sensitive'
 
@@ -108,16 +110,6 @@ export function hashText(value: string): string {
   return `sha256:${createHash('sha256').update(value, 'utf8').digest('hex')}`
 }
 
-export function isJsonValue(value: unknown): value is JsonValue {
-  if (value === null) return true
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return true
-  }
-  if (Array.isArray(value)) return value.every(isJsonValue)
-  if (typeof value !== 'object') return false
-  return Object.values(value as Record<string, unknown>).every(isJsonValue)
-}
-
 export function assertValidCapture(value: unknown): LoreCapture {
   if (!value || typeof value !== 'object') throw new Error('Capture must be an object')
   const capture = value as Partial<LoreCapture>
@@ -155,4 +147,42 @@ export function assertValidCapture(value: unknown): LoreCapture {
     throw new Error('Capture metadata must be an object')
   }
   return value as LoreCapture
+}
+
+/**
+ * Normalizes a persisted connector instance.
+ *
+ * Absent optional fields fall back to their defaults, but a field present with
+ * the wrong type is an error: a hand-edited `config.json` should fail loudly
+ * rather than silently run with a coerced value.
+ */
+export function assertConnectorInstance(value: unknown, label = 'connector instance'): ConnectorInstance {
+  if (!isPlainObject(value)) throw new Error(`${label} must be an object`)
+
+  const { id, connector, enabled, schedule, config, checkpoint } = value
+  if (typeof id !== 'string' || !id.trim()) throw new Error(`${label} requires a non-empty id`)
+  if (typeof connector !== 'string' || !connector.trim()) {
+    throw new Error(`${label} "${id}" requires a connector id`)
+  }
+  if (enabled !== undefined && typeof enabled !== 'boolean') {
+    throw new Error(`${label} "${id}" has a non-boolean enabled`)
+  }
+  if (schedule !== undefined && schedule !== null && typeof schedule !== 'string') {
+    throw new Error(`${label} "${id}" has a non-string schedule`)
+  }
+  if (config !== undefined && !isPlainObject(config)) {
+    throw new Error(`${label} "${id}" has a non-object config`)
+  }
+  if (checkpoint !== undefined && checkpoint !== null && !isPlainObject(checkpoint)) {
+    throw new Error(`${label} "${id}" has a non-object checkpoint`)
+  }
+
+  return {
+    id: id.trim(),
+    connector: connector.trim(),
+    enabled: enabled ?? true,
+    schedule: schedule ?? null,
+    config: config ?? {},
+    checkpoint: checkpoint ?? null,
+  }
 }
