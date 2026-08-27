@@ -7,7 +7,7 @@ import { createManualCapture } from '../src/capture.js'
 import { OutboxStore } from '../src/outbox.js'
 
 async function makeRoot(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'pr-lore-outbox-'))
+  return mkdtemp(join(tmpdir(), 'pr-atlas-outbox-'))
 }
 
 test('status is the entry location, so marking moves the file', async () => {

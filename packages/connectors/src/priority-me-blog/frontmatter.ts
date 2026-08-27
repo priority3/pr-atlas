@@ -1,4 +1,4 @@
-import type { JsonValue } from '@pr-lore/schema'
+import type { JsonValue } from '@pr-atlas/schema'
 
 /**
  * A YAML subset parser for Markdown frontmatter.
@@ -17,7 +17,7 @@ import type { JsonValue } from '@pr-lore/schema'
  * anything it did not understand, so a mis-indented `tags:` list silently
  * became no tags at all.
  *
- * Dates are intentionally left as strings: `LoreCapture` metadata is JSON.
+ * Dates are intentionally left as strings: `AtlasCapture` metadata is JSON.
  */
 export interface Frontmatter {
   data: Record<string, JsonValue>

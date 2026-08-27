@@ -1,12 +1,12 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { DELIVERER_KINDS, isDelivererKind, type DelivererKind } from '@pr-lore/core'
+import { DELIVERER_KINDS, isDelivererKind, type DelivererKind } from '@pr-atlas/core'
 import {
   assertConnectorInstance,
   isPlainObject,
   type ConnectorInstance,
   type JsonValue,
-} from '@pr-lore/schema'
+} from '@pr-atlas/schema'
 
 export interface DeliveryTarget {
   id: string
@@ -14,7 +14,7 @@ export interface DeliveryTarget {
   config: Record<string, JsonValue>
 }
 
-export interface LoreConfigFile {
+export interface AtlasConfigFile {
   version: 1
   instances: ConnectorInstance[]
   targets: DeliveryTarget[]
@@ -27,7 +27,7 @@ export class ConfigStore {
     this.file = join(dataDirectory, 'config.json')
   }
 
-  async load(): Promise<LoreConfigFile> {
+  async load(): Promise<AtlasConfigFile> {
     let raw: string
     try {
       raw = await readFile(this.file, 'utf8')
@@ -59,7 +59,7 @@ export class ConfigStore {
     }
   }
 
-  async save(config: LoreConfigFile): Promise<void> {
+  async save(config: AtlasConfigFile): Promise<void> {
     await mkdir(dirname(this.file), { recursive: true })
     const temporary = `${this.file}.tmp`
     await writeFile(temporary, `${JSON.stringify(config, null, 2)}\n`, 'utf8')

@@ -66,7 +66,7 @@ export function parseGitHubRepository(value: string): GitHubRepository {
 export function githubHeaders(tokenEnv: string | undefined): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',
-    'User-Agent': 'pr-lore/0.2.0',
+    'User-Agent': 'pr-atlas/0.2.0',
   }
   const token = tokenEnv ? process.env[tokenEnv]?.trim() : undefined
   if (token) headers.Authorization = `Bearer ${token}`

@@ -5,10 +5,10 @@ import {
   type ConnectorManifest,
   type ConnectorResult,
   type JsonValue,
-  type LoreCapture,
-  type LoreConnector,
+  type AtlasCapture,
+  type AtlasConnector,
   type PrivacyLevel,
-} from '@pr-lore/schema'
+} from '@pr-atlas/schema'
 import { mapWithConcurrency } from '../shared/pool.js'
 import { parseFrontmatter } from './frontmatter.js'
 import {
@@ -81,7 +81,7 @@ const manifest: ConnectorManifest = {
   },
 }
 
-export function createPriorityMeBlogConnector(): LoreConnector {
+export function createPriorityMeBlogConnector(): AtlasConnector {
   return {
     manifest: () => manifest,
     async collect(context: ConnectorContext): Promise<ConnectorResult> {
@@ -145,7 +145,7 @@ interface CaptureInput {
   raw: string
 }
 
-function toCapture(input: CaptureInput): LoreCapture {
+function toCapture(input: CaptureInput): AtlasCapture {
   const { context, config, repository, ref, contentDir, file, raw } = input
   const parsed = parseFrontmatter(raw)
   const slug = slugifyPath(file.path.slice(contentDir.length + 1).replace(/\.(md|mdoc)$/i, ''))
@@ -156,7 +156,7 @@ function toCapture(input: CaptureInput): LoreCapture {
   const articleUrl = siteUrl ? `${siteUrl}/posts/${encodePath(slug)}` : null
 
   return {
-    schema_version: 'lore.capture.v1',
+    schema_version: 'atlas.capture.v1',
     id: stableId(
       'cap',
       JSON.stringify({ connector: manifest.id, instance: context.instance.id, uri, contentHash }),

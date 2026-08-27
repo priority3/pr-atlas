@@ -1,4 +1,4 @@
-import { OutboxStore, createDeliverer, syncOutbox, type SyncOptions } from '@pr-lore/core'
+import { OutboxStore, createDeliverer, syncOutbox, type SyncOptions } from '@pr-atlas/core'
 import { option, options, type ParsedArgs } from '../inputs/args.js'
 import { ConfigStore, type DeliveryTarget } from '../runtime/config.js'
 import { dataDirectory, emit } from '../runtime/io.js'
@@ -38,7 +38,7 @@ async function resolveTarget(store: ConfigStore, id: string | null): Promise<Del
   if (!only) {
     throw new Error(
       'No delivery target configured. Add one with:\n' +
-        '  lore target set local --kind file --config \'{"directory":"./lore-export"}\'',
+        '  atlas target set local --kind file --config \'{"directory":"./atlas-export"}\'',
     )
   }
   if (targets.length > 1) {

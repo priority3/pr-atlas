@@ -1,5 +1,5 @@
-import { createGenericWebConnector, createPriorityMeBlogConnector } from '@pr-lore/connectors'
-import { ConnectorRegistry } from '@pr-lore/core'
+import { createGenericWebConnector, createPriorityMeBlogConnector } from '@pr-atlas/connectors'
+import { ConnectorRegistry } from '@pr-atlas/core'
 
 export function createBuiltinRegistry(): ConnectorRegistry {
   const registry = new ConnectorRegistry()

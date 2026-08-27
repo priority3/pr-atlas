@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
 import assert from 'node:assert/strict'
-import type { LoreCapture } from '@pr-lore/schema'
+import type { AtlasCapture } from '@pr-atlas/schema'
 import { createManualCapture } from '../src/capture.js'
 import { OutboxStore } from '../src/outbox.js'
 import {
@@ -18,11 +18,11 @@ const originalFetch = globalThis.fetch
 
 afterEach(() => {
   globalThis.fetch = originalFetch
-  delete process.env.PR_LORE_TEST_WEBHOOK_TOKEN
+  delete process.env.PR_ATLAS_TEST_WEBHOOK_TOKEN
 })
 
 async function makeStore(): Promise<{ store: OutboxStore; root: string }> {
-  const root = await mkdtemp(join(tmpdir(), 'pr-lore-delivery-'))
+  const root = await mkdtemp(join(tmpdir(), 'pr-atlas-delivery-'))
   return { store: new OutboxStore(root), root }
 }
 
@@ -44,9 +44,9 @@ test('file target exports each capture and marks it sent', async () => {
   assert.deepEqual(await store.summary(), { total: 2, pending: 0, sent: 2, failed: 0 })
 
   assert.deepEqual((await readdir(destination)).sort(), [`${a.id}.json`, `${b.id}.json`].sort())
-  const exported = JSON.parse(await readFile(join(destination, `${a.id}.json`), 'utf8')) as LoreCapture
+  const exported = JSON.parse(await readFile(join(destination, `${a.id}.json`), 'utf8')) as AtlasCapture
   assert.equal(exported.id, a.id)
-  assert.equal(exported.schema_version, 'lore.capture.v1')
+  assert.equal(exported.schema_version, 'atlas.capture.v1')
 })
 
 test('a throwing target records the failure and increments attempts', async () => {
@@ -135,16 +135,16 @@ test('webhook target posts the capture as JSON with a bearer token', async () =>
   const { store } = await makeStore()
   const capture = createManualCapture({ uri: 'https://example.com/hook' })
   await store.enqueue(capture)
-  process.env.PR_LORE_TEST_WEBHOOK_TOKEN = 'secret-token'
+  process.env.PR_ATLAS_TEST_WEBHOOK_TOKEN = 'secret-token'
 
-  const observed: Array<{ url: string; method: string | null; auth: string | null; body: LoreCapture }> = []
+  const observed: Array<{ url: string; method: string | null; auth: string | null; body: AtlasCapture }> = []
   globalThis.fetch = async (input, init) => {
     const headers = new Headers(init?.headers)
     observed.push({
       url: String(input),
       method: init?.method ?? null,
       auth: headers.get('authorization'),
-      body: JSON.parse(String(init?.body)) as LoreCapture,
+      body: JSON.parse(String(init?.body)) as AtlasCapture,
     })
     assert.equal(headers.get('content-type'), 'application/json')
     return new Response(null, { status: 204 })
@@ -152,7 +152,7 @@ test('webhook target posts the capture as JSON with a bearer token', async () =>
 
   const summary = await syncOutbox(
     store,
-    createDeliverer('webhook', { url: 'https://sink.example/hook', token_env: 'PR_LORE_TEST_WEBHOOK_TOKEN' }, 'remote'),
+    createDeliverer('webhook', { url: 'https://sink.example/hook', token_env: 'PR_ATLAS_TEST_WEBHOOK_TOKEN' }, 'remote'),
   )
 
   assert.deepEqual(summary.delivered, [capture.id])
@@ -186,9 +186,9 @@ test('a webhook target with an unset token env fails before sending anything', a
 
   const summary = await syncOutbox(
     store,
-    createWebhookDeliverer({ url: 'https://sink.example/hook', token_env: 'PR_LORE_MISSING_TOKEN' }),
+    createWebhookDeliverer({ url: 'https://sink.example/hook', token_env: 'PR_ATLAS_MISSING_TOKEN' }),
   )
-  assert.match(summary.failed[0]?.error ?? '', /PR_LORE_MISSING_TOKEN is not set/)
+  assert.match(summary.failed[0]?.error ?? '', /PR_ATLAS_MISSING_TOKEN is not set/)
   assert.equal(called, false)
 })
 

@@ -14,7 +14,7 @@ test('assertValidCapture rejects incomplete values', () => {
   assert.throws(
     () =>
       assertValidCapture({
-        schema_version: 'lore.capture.v1',
+        schema_version: 'atlas.capture.v1',
         id: 'cap_test',
         connector: 'manual',
         observed_at: 'now',

@@ -1,6 +1,6 @@
 import { afterEach, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { assertValidCapture, type ConnectorContext, type JsonValue } from '@pr-lore/schema'
+import { assertValidCapture, type ConnectorContext, type JsonValue } from '@pr-atlas/schema'
 import { createPriorityMeBlogConnector } from '../src/priority-me-blog/index.js'
 
 const originalFetch = globalThis.fetch
@@ -52,20 +52,20 @@ test('priority-me-blog reads GitHub Markdown and ignores leetcode content', asyn
 test('priority-me-blog accepts a GitHub tree URL and optional token environment', async () => {
   const calls: string[] = []
   installGitHubFixture(calls)
-  process.env.PR_LORE_TEST_TOKEN = 'test-token'
+  process.env.PR_ATLAS_TEST_TOKEN = 'test-token'
   try {
     const connector = createPriorityMeBlogConnector()
     const result = await connector.collect({
       ...createContext({
         repository_url: 'https://github.com/example/priority.me/tree/main/src/content/blogs',
-        token_env: 'PR_LORE_TEST_TOKEN',
+        token_env: 'PR_ATLAS_TEST_TOKEN',
       }),
     })
     assert.equal(result.captures.length, 2)
     assert.ok(calls.every(url => url.startsWith('https://')))
     assert.equal(result.checkpoint?.content_dir, 'src/content/blogs')
   } finally {
-    delete process.env.PR_LORE_TEST_TOKEN
+    delete process.env.PR_ATLAS_TEST_TOKEN
   }
 })
 
@@ -423,14 +423,14 @@ test('an exhausted anonymous rate limit explains how to raise it', async () => {
 
 test('an exhausted authenticated rate limit suggests narrowing the scan instead', async () => {
   globalThis.fetch = async () => rateLimitedResponse()
-  process.env.PR_LORE_TEST_TOKEN = 'test-token'
+  process.env.PR_ATLAS_TEST_TOKEN = 'test-token'
   try {
     await assert.rejects(
-      createPriorityMeBlogConnector().collect(createContext({ token_env: 'PR_LORE_TEST_TOKEN' })),
+      createPriorityMeBlogConnector().collect(createContext({ token_env: 'PR_ATLAS_TEST_TOKEN' })),
       /rate limit exhausted.*narrow config\.content_dir/s,
     )
   } finally {
-    delete process.env.PR_LORE_TEST_TOKEN
+    delete process.env.PR_ATLAS_TEST_TOKEN
   }
 })
 

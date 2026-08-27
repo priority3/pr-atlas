@@ -1,10 +1,10 @@
 {
-  "name": "@pr-lore/schema",
+  "name": "@pr-atlas/schema",
   "version": "0.2.0",
   "type": "module",
-  "description": "Data contract for pr-lore: lore.capture.v1 types, stable IDs, and a JSON Schema subset validator.",
+  "description": "Data contract for pr-atlas: atlas.capture.v1 types, stable IDs, and a JSON Schema subset validator.",
   "keywords": [
-    "pr-lore",
+    "pr-atlas",
     "capture",
     "schema",
     "json-schema",
@@ -12,14 +12,14 @@
   ],
   "license": "MIT",
   "author": "priority3",
-  "homepage": "https://github.com/priority3/pr-lore#readme",
+  "homepage": "https://github.com/priority3/pr-atlas#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/priority3/pr-lore.git",
+    "url": "git+https://github.com/priority3/pr-atlas.git",
     "directory": "packages/schema"
   },
   "bugs": {
-    "url": "https://github.com/priority3/pr-lore/issues"
+    "url": "https://github.com/priority3/pr-atlas/issues"
   },
   "engines": {
     "node": ">=20"

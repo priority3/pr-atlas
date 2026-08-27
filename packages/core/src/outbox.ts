@@ -1,13 +1,13 @@
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { assertValidCapture, type LoreCapture } from '@pr-lore/schema'
+import { assertValidCapture, type AtlasCapture } from '@pr-atlas/schema'
 
 export type OutboxStatus = 'pending' | 'sent' | 'failed'
 
 export const OUTBOX_STATUSES: readonly OutboxStatus[] = ['pending', 'sent', 'failed']
 
 export interface OutboxEntry {
-  capture: LoreCapture
+  capture: AtlasCapture
   status: OutboxStatus
   attempts: number
   last_error: string | null
@@ -37,7 +37,7 @@ export class OutboxStore {
     this.directory = join(rootDirectory, 'outbox')
   }
 
-  async enqueue(capture: LoreCapture): Promise<OutboxEntry> {
+  async enqueue(capture: AtlasCapture): Promise<OutboxEntry> {
     assertValidCapture(capture)
     await this.prepare()
 

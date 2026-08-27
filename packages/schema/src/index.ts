@@ -29,8 +29,8 @@ export type PayloadKind =
   | 'json'
   | 'binary'
 
-export interface LoreCapture {
-  schema_version: 'lore.capture.v1'
+export interface AtlasCapture {
+  schema_version: 'atlas.capture.v1'
   id: string
   connector: string
   instance_id: string | null
@@ -92,11 +92,11 @@ export interface ConnectorContext {
 }
 
 export interface ConnectorResult {
-  captures: LoreCapture[]
+  captures: AtlasCapture[]
   checkpoint: Record<string, JsonValue> | null
 }
 
-export interface LoreConnector {
+export interface AtlasConnector {
   manifest(): ConnectorManifest
   collect(context: ConnectorContext): Promise<ConnectorResult>
 }
@@ -110,10 +110,10 @@ export function hashText(value: string): string {
   return `sha256:${createHash('sha256').update(value, 'utf8').digest('hex')}`
 }
 
-export function assertValidCapture(value: unknown): LoreCapture {
+export function assertValidCapture(value: unknown): AtlasCapture {
   if (!value || typeof value !== 'object') throw new Error('Capture must be an object')
-  const capture = value as Partial<LoreCapture>
-  if (capture.schema_version !== 'lore.capture.v1') {
+  const capture = value as Partial<AtlasCapture>
+  if (capture.schema_version !== 'atlas.capture.v1') {
     throw new Error('Unsupported capture schema')
   }
   if (
@@ -146,7 +146,7 @@ export function assertValidCapture(value: unknown): LoreCapture {
   if (!capture.metadata || typeof capture.metadata !== 'object' || Array.isArray(capture.metadata) || !isJsonValue(capture.metadata)) {
     throw new Error('Capture metadata must be an object')
   }
-  return value as LoreCapture
+  return value as AtlasCapture
 }
 
 /**

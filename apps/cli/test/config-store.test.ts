@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { ConfigStore } from '../src/runtime/config.js'
 
 async function makeDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'pr-lore-config-'))
+  return mkdtemp(join(tmpdir(), 'pr-atlas-config-'))
 }
 
 async function writeRaw(directory: string, contents: string): Promise<void> {

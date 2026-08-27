@@ -1,8 +1,8 @@
-# pr-lore
+# pr-atlas
 
-`pr-lore` 是一个独立的个人信息采集运行时。它只定义「内容源如何输入」和「统一记忆如何输出」，不依赖任何特定 Blog、Astro、CMS 或站点仓库。
+`pr-atlas` 是一个独立的个人信息采集运行时。它只定义「内容源如何输入」和「统一记忆如何输出」，不依赖任何特定 Blog、Astro、CMS 或站点仓库。
 
-当前 CLI 名称是 `lore`。后续可以在同一套 Connector SDK 上增加常驻调度进程 `lored`、上传服务和可视化审核界面。
+当前 CLI 名称是 `atlas`。后续可以在同一套 Connector SDK 上增加常驻调度进程 `atlasd`、上传服务和可视化审核界面。
 
 ## 架构
 
@@ -13,16 +13,16 @@ Connector Definition
 Connector Instance -- schedule / checkpoint / config
         |
         v
-      lore connector run
+      atlas connector run
         |
         v
-  LoreCapture (lore.capture.v1)
+  AtlasCapture (atlas.capture.v1)
         |
         v
-  Local Outbox (.lore/outbox/{pending,sent,failed})
+  Local Outbox (.atlas/outbox/{pending,sent,failed})
         |
         v
-  Deliverer -- lore sync
+  Deliverer -- atlas sync
         |
         +--> file export / webhook / future review UI / LLM index
 ```
@@ -31,20 +31,20 @@ Connector Instance -- schedule / checkpoint / config
 
 | 目录 | 职责 |
 | --- | --- |
-| `packages/schema` | `LoreCapture`、Connector manifest/context/result、稳定 ID、capture 与 instance 校验、`config_schema` 的 JSON Schema 子集校验器 |
+| `packages/schema` | `AtlasCapture`、Connector manifest/context/result、稳定 ID、capture 与 instance 校验、`config_schema` 的 JSON Schema 子集校验器 |
 | `packages/core` | Connector registry、运行上下文、手动 capture、状态目录型 outbox、Deliverer 与 `syncOutbox` |
 | `packages/connectors` | 内置内容源。当前包含 `generic-web` 和 `priority-me-blog` |
-| `apps/cli` | `lore` 命令、实例与投递目标配置、触发 Connector、把结果写入 outbox 并投递 |
+| `apps/cli` | `atlas` 命令、实例与投递目标配置、触发 Connector、把结果写入 outbox 并投递 |
 
 Connector 是可插拔的采集能力；未来更宽泛的安装包能力可以叫 Extension，但当前协议只使用 Connector。
 
 ## 统一输出
 
-所有来源都输出同一个 `lore.capture.v1`，不再为「记住一个链接」「关注一个来源」「导入一篇文章」设计三套数据结构。
+所有来源都输出同一个 `atlas.capture.v1`，不再为「记住一个链接」「关注一个来源」「导入一篇文章」设计三套数据结构。
 
 ```json
 {
-  "schema_version": "lore.capture.v1",
+  "schema_version": "atlas.capture.v1",
   "id": "cap_...",
   "connector": "priority-me-blog",
   "instance_id": "priority",
@@ -96,31 +96,31 @@ blob 请求以并发上限 4 并行，并保持输入顺序。未认证的 GitHu
 要忽略 checkpoint 强制全量重采：
 
 ```bash
-lore connector run priority-me-blog --instance priority --full
+atlas connector run priority-me-blog --instance priority --full
 ```
 
 ## 投递与同步
 
-outbox 里的条目通过 **Deliverer** 出站。状态由文件位置表示（`.lore/outbox/{pending,sent,failed}/`），所以计数是一次目录列举，状态流转是一次原子 rename。
+outbox 里的条目通过 **Deliverer** 出站。状态由文件位置表示（`.atlas/outbox/{pending,sent,failed}/`），所以计数是一次目录列举，状态流转是一次原子 rename。
 
 内置两种目标：
 
 ```bash
 # 导出到本地目录
-lore target set local --kind file --config '{"directory":"./lore-export"}'
+atlas target set local --kind file --config '{"directory":"./atlas-export"}'
 
 # POST 到 HTTP 端点，token 只配环境变量名
-lore target set remote --kind webhook \
-  --config '{"url":"https://example.com/hook","token_env":"PR_LORE_SINK_TOKEN"}'
+atlas target set remote --kind webhook \
+  --config '{"url":"https://example.com/hook","token_env":"PR_ATLAS_SINK_TOKEN"}'
 
-lore target list
-lore target kinds     # 查看每种目标的 config schema
-lore sync --target local [--limit 20] [--id <capture-id>]
+atlas target list
+atlas target kinds     # 查看每种目标的 config schema
+atlas sync --target local [--limit 20] [--id <capture-id>]
 ```
 
-投递失败会把条目标为 `failed` 并累加 `attempts`，`lore retry` 可把它们改回 `pending`。
+投递失败会把条目标为 `failed` 并累加 `attempts`，`atlas retry` 可把它们改回 `pending`。
 
-**隐私默认 fail-closed**：`privacy.level` 为 `sensitive` 的 capture 不会投递到 webhook 目标，除非该目标显式声明 `include_privacy_levels`。被跳过的条目既不算成功也不算失败，保持 `pending`，并出现在 `lore sync` 输出的 `skipped` 字段里 —— 不静默丢弃。
+**隐私默认 fail-closed**：`privacy.level` 为 `sensitive` 的 capture 不会投递到 webhook 目标，除非该目标显式声明 `include_privacy_levels`。被跳过的条目既不算成功也不算失败，保持 `pending`，并出现在 `atlas sync` 输出的 `skipped` 字段里 —— 不静默丢弃。
 
 只配置了一个目标时 `--target` 可省略；配置了多个时必须显式指定。
 
@@ -130,31 +130,31 @@ lore sync --target local [--limit 20] [--id <capture-id>]
 
 ```bash
 pnpm install
-pnpm lore help
+pnpm atlas help
 ```
 
-开发阶段可以把下面的 `lore` 替换为 `pnpm lore`；发布 CLI 后再直接使用 `lore`。
+开发阶段可以把下面的 `atlas` 替换为 `pnpm atlas`；发布 CLI 后再直接使用 `atlas`。
 
-默认数据目录是当前目录的 `.lore`，也可以用 `--data-dir` 或 `LORE_DATA_DIR` 指定。`.lore` 已加入 `.gitignore`。
+默认数据目录是当前目录的 `.atlas`，也可以用 `--data-dir` 或 `ATLAS_DATA_DIR` 指定。`.atlas` 已加入 `.gitignore`。
 
 手动采集 URL 或文本：
 
 ```bash
-lore capture --url "https://example.com/article" --title "一篇文章" --note "值得回看" --tag ai
-lore capture --text "今天想到的一个设计" --title "临时想法"
+atlas capture --url "https://example.com/article" --title "一篇文章" --note "值得回看" --tag ai
+atlas capture --text "今天想到的一个设计" --title "临时想法"
 ```
 
 查看 Connector、outbox 和实例：
 
 ```bash
-lore connector list
-lore status
-lore config list
+atlas connector list
+atlas status
+atlas config list
 ```
 
-`lore save --file capture.json` 可把一个 capture（或包含 `capture` 字段的 CLI 输出）放进 outbox；`lore retry` 会把失败条目重新置为 pending。
+`atlas save --file capture.json` 可把一个 capture（或包含 `capture` 字段的 CLI 输出）放进 outbox；`atlas retry` 会把失败条目重新置为 pending。
 
-`lore help` 列出全部命令。
+`atlas help` 列出全部命令。
 
 ## priority.me Blog Connector
 
@@ -185,7 +185,7 @@ lore config list
 先写入一个 Connector instance：
 
 ```bash
-  lore config set priority \
+  atlas config set priority \
   --connector priority-me-blog \
   --config '{
     "repository_url": "https://github.com/priority3/priority.me",
@@ -200,13 +200,13 @@ lore config list
 执行一次：
 
 ```bash
-lore connector run priority-me-blog --instance priority --trigger manual
+atlas connector run priority-me-blog --instance priority --trigger manual
 ```
 
 由 cron 定期触发：
 
 ```cron
-0 * * * * cd /path/to/pr-lore && lore connector run priority-me-blog --instance priority --trigger schedule >> /tmp/lore.log 2>&1
+0 * * * * cd /path/to/pr-atlas && atlas connector run priority-me-blog --instance priority --trigger schedule >> /tmp/atlas.log 2>&1
 ```
 
 公共仓库不需要令牌。私有仓库不要把 token 放进 `config.json`，只配置环境变量名：
@@ -214,20 +214,20 @@ lore connector run priority-me-blog --instance priority --trigger manual
 ```json
 {
   "repository_url": "https://github.com/owner/private-blog",
-  "token_env": "PR_LORE_GITHUB_TOKEN"
+  "token_env": "PR_ATLAS_GITHUB_TOKEN"
 }
 ```
 
-运行命令前由操作系统或服务管理器注入 `PR_LORE_GITHUB_TOKEN`。Blog capture 默认 `private` 且不允许云端 LLM；只有明确写入 `allow_cloud_llm: true` 才会改变这一点。
+运行命令前由操作系统或服务管理器注入 `PR_ATLAS_GITHUB_TOKEN`。Blog capture 默认 `private` 且不允许云端 LLM；只有明确写入 `allow_cloud_llm: true` 才会改变这一点。
 
 ## Connector SDK
 
 Connector 只需要实现三个部分：
 
 ```ts
-import type { ConnectorContext, ConnectorResult, LoreConnector } from '@pr-lore/schema'
+import type { ConnectorContext, ConnectorResult, AtlasConnector } from '@pr-atlas/schema'
 
-export const connector: LoreConnector = {
+export const connector: AtlasConnector = {
   manifest() {
     return {
       id: 'my-source',
@@ -241,7 +241,7 @@ export const connector: LoreConnector = {
     }
   },
   async collect(context: ConnectorContext): Promise<ConnectorResult> {
-    // 读取 context.instance.config，转换成 LoreCapture[]
+    // 读取 context.instance.config，转换成 AtlasCapture[]
     return { captures: [], checkpoint: context.instance.checkpoint }
   }
 }
@@ -266,11 +266,11 @@ Connector 不应依赖 CLI、Blog 站点实现或用户 home 目录；所有输�
 
 ### config_schema 会被真正执行
 
-manifest 里的 `config_schema` 不是文档，而是会被校验的契约。`runConnector` 在调用 `collect` 前校验 `instance.config`，`lore config set` 在写入前也校验一次 —— 前者是强制点（daemon、webhook 走同一条路），后者是为了让拼写错误在配置时就暴露：
+manifest 里的 `config_schema` 不是文档，而是会被校验的契约。`runConnector` 在调用 `collect` 前校验 `instance.config`，`atlas config set` 在写入前也校验一次 —— 前者是强制点（daemon、webhook 走同一条路），后者是为了让拼写错误在配置时就暴露：
 
 ```bash
-$ lore config set bad --connector generic-web --config '{"urlx":"x"}'
-lore: Invalid config for connector generic-web:
+$ atlas config set bad --connector generic-web --config '{"urlx":"x"}'
+atlas: Invalid config for connector generic-web:
   - config.url is required
   - config.urlx is not a recognized option (did you mean "url"?)
 ```
@@ -306,10 +306,10 @@ node apps/cli/dist/main.js help
 
 | 包 | 用途 |
 | --- | --- |
-| [`@pr-lore/cli`](https://www.npmjs.com/package/@pr-lore/cli) | `lore` 命令，`npm i -g @pr-lore/cli` |
-| [`@pr-lore/core`](https://www.npmjs.com/package/@pr-lore/core) | registry、outbox、Deliverer |
-| [`@pr-lore/connectors`](https://www.npmjs.com/package/@pr-lore/connectors) | 内置内容源 |
-| [`@pr-lore/schema`](https://www.npmjs.com/package/@pr-lore/schema) | 数据契约，零依赖 |
+| [`@pr-atlas/cli`](https://www.npmjs.com/package/@pr-atlas/cli) | `atlas` 命令，`npm i -g @pr-atlas/cli` |
+| [`@pr-atlas/core`](https://www.npmjs.com/package/@pr-atlas/core) | registry、outbox、Deliverer |
+| [`@pr-atlas/connectors`](https://www.npmjs.com/package/@pr-atlas/connectors) | 内置内容源 |
+| [`@pr-atlas/schema`](https://www.npmjs.com/package/@pr-atlas/schema) | 数据契约，零依赖 |
 
 发布走 `scripts/release.sh`：
 

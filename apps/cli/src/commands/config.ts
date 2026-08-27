@@ -1,5 +1,5 @@
-import type { ConnectorRegistry } from '@pr-lore/core'
-import { validateJsonSchema, type ConnectorInstance } from '@pr-lore/schema'
+import type { ConnectorRegistry } from '@pr-atlas/core'
+import { validateJsonSchema, type ConnectorInstance } from '@pr-atlas/schema'
 import { hasFlag, option, requiredOption, type ParsedArgs } from '../inputs/args.js'
 import { ConfigStore, asJsonObject } from '../runtime/config.js'
 import { dataDirectory, emit } from '../runtime/io.js'

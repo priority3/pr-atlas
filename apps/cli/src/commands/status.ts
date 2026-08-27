@@ -1,4 +1,4 @@
-import { OutboxStore, type ConnectorRegistry } from '@pr-lore/core'
+import { OutboxStore, type ConnectorRegistry } from '@pr-atlas/core'
 import { option, type ParsedArgs } from '../inputs/args.js'
 import { ConfigStore } from '../runtime/config.js'
 import { dataDirectory, emit } from '../runtime/io.js'

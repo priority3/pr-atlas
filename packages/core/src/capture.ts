@@ -3,10 +3,10 @@ import {
   stableId,
   type CaptureTrigger,
   type JsonValue,
-  type LoreCapture,
+  type AtlasCapture,
   type PrivacyLevel,
   type SubjectKind,
-} from '@pr-lore/schema'
+} from '@pr-atlas/schema'
 
 export interface ManualCaptureInput {
   uri: string
@@ -22,7 +22,7 @@ export interface ManualCaptureInput {
   allow_cloud_llm?: boolean
 }
 
-export function createManualCapture(input: ManualCaptureInput): LoreCapture {
+export function createManualCapture(input: ManualCaptureInput): AtlasCapture {
   const now = input.now ?? new Date().toISOString()
   const title = input.title?.trim() || null
   const note = input.note?.trim() || null
@@ -38,7 +38,7 @@ export function createManualCapture(input: ManualCaptureInput): LoreCapture {
   })
 
   return {
-    schema_version: 'lore.capture.v1',
+    schema_version: 'atlas.capture.v1',
     id: stableId('cap', seed),
     connector: 'manual',
     instance_id: null,

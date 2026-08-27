@@ -36,7 +36,7 @@ async function run(argv: string[]): Promise<{ stdout: string; stderr: string }> 
 }
 
 async function makeDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'pr-lore-cli-'))
+  return mkdtemp(join(tmpdir(), 'pr-atlas-cli-'))
 }
 
 test('capture, target and sync form a working loop', async () => {
@@ -120,7 +120,7 @@ test('target set rejects config that violates the target schema', async () => {
 test('sync without a configured target says how to add one', async () => {
   const { stderr } = await run(['sync', '--data-dir', await makeDir()])
   assert.match(stderr, /No delivery target configured/)
-  assert.match(stderr, /lore target set/)
+  assert.match(stderr, /atlas target set/)
 })
 
 test('sync with several targets refuses to guess', async () => {
@@ -180,8 +180,8 @@ test('retry moves failed entries back to pending', async () => {
 
 test('help documents the delivery commands and incremental behaviour', async () => {
   const { stdout } = await run(['help'])
-  assert.match(stdout, /lore sync/)
-  assert.match(stdout, /lore target/)
+  assert.match(stdout, /atlas sync/)
+  assert.match(stdout, /atlas target/)
   assert.match(stdout, /--full/)
   assert.match(stdout, /Runs are incremental/)
 })

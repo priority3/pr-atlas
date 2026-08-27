@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# 把 @pr-lore/* 四个包发布到 npmjs.org。
+# 把 @pr-atlas/* 四个包发布到 npmjs.org。
 #
 #   scripts/release.sh --dry-run          # 走完全部检查与打包，但不真的发布
 #   scripts/release.sh                    # 发布 package.json 里当前的版本
@@ -113,7 +113,7 @@ do
   [ -f "$f" ] || fail "缺少构建产物：$f"
 done
 
-# Reason: bin 入口丢了 shebang 的话，npm i -g 之后 `lore` 会被 shell 当脚本执行而报错，
+# Reason: bin 入口丢了 shebang 的话，npm i -g 之后 `atlas` 会被 shell 当脚本执行而报错，
 # 而这在本地用 node 直接跑是发现不了的。
 head -1 apps/cli/dist/main.js | grep -q '^#!/usr/bin/env node' \
   || fail "apps/cli/dist/main.js 缺少 shebang，bin 入口会不可执行"
@@ -149,8 +149,8 @@ git push origin main --follow-tags
 
 step "校验 registry"
 for p in schema core connectors cli; do
-  PUBLISHED="$(npm view "@pr-lore/$p" version --registry "$REGISTRY" 2>/dev/null || echo '(查询失败)')"
-  printf '  @pr-lore/%-11s %s\n' "$p" "$PUBLISHED"
+  PUBLISHED="$(npm view "@pr-atlas/$p" version --registry "$REGISTRY" 2>/dev/null || echo '(查询失败)')"
+  printf '  @pr-atlas/%-11s %s\n' "$p" "$PUBLISHED"
 done
 
 printf '\n\033[32m%s 发布完成\033[0m\n' "$TAG"

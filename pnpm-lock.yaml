@@ -20,25 +20,25 @@ importers:
 
   apps/cli:
     dependencies:
-      '@pr-lore/connectors':
+      '@pr-atlas/connectors':
         specifier: workspace:*
         version: link:../../packages/connectors
-      '@pr-lore/core':
+      '@pr-atlas/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@pr-lore/schema':
+      '@pr-atlas/schema':
         specifier: workspace:*
         version: link:../../packages/schema
 
   packages/connectors:
     dependencies:
-      '@pr-lore/schema':
+      '@pr-atlas/schema':
         specifier: workspace:*
         version: link:../schema
 
   packages/core:
     dependencies:
-      '@pr-lore/schema':
+      '@pr-atlas/schema':
         specifier: workspace:*
         version: link:../schema
 

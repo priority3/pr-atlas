@@ -19,7 +19,7 @@ test('manual captures support URL and text payloads with stable IDs', () => {
 })
 
 test('outbox enqueue is idempotent and preserves delivery status', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'pr-lore-core-'))
+  const directory = await mkdtemp(join(tmpdir(), 'pr-atlas-core-'))
   const store = new OutboxStore(directory)
   const capture = createManualCapture({ uri: 'https://example.com/idempotent' })
   const first = await store.enqueue(capture)

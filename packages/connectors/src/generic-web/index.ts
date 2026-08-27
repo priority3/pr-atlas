@@ -5,9 +5,9 @@ import {
   type ConnectorManifest,
   type ConnectorResult,
   type JsonValue,
-  type LoreConnector,
+  type AtlasConnector,
   type PrivacyLevel,
-} from '@pr-lore/schema'
+} from '@pr-atlas/schema'
 import { describeNetworkFailure } from '../shared/http.js'
 
 const REQUEST_TIMEOUT_MS = 20_000
@@ -44,7 +44,7 @@ const manifest: ConnectorManifest = {
   },
 }
 
-export function createGenericWebConnector(): LoreConnector {
+export function createGenericWebConnector(): AtlasConnector {
   return {
     manifest: () => manifest,
     async collect(context: ConnectorContext): Promise<ConnectorResult> {
@@ -74,7 +74,7 @@ export function createGenericWebConnector(): LoreConnector {
       return {
         captures: [
           {
-            schema_version: 'lore.capture.v1',
+            schema_version: 'atlas.capture.v1',
             id: captureId,
             connector: manifest.id,
             instance_id: context.instance.id,

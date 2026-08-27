@@ -1,10 +1,10 @@
 {
-  "name": "@pr-lore/connectors",
+  "name": "@pr-atlas/connectors",
   "version": "0.2.0",
   "type": "module",
-  "description": "Built-in pr-lore content sources: generic-web and priority-me-blog.",
+  "description": "Built-in pr-atlas content sources: generic-web and priority-me-blog.",
   "keywords": [
-    "pr-lore",
+    "pr-atlas",
     "connector",
     "github",
     "frontmatter",
@@ -12,14 +12,14 @@
   ],
   "license": "MIT",
   "author": "priority3",
-  "homepage": "https://github.com/priority3/pr-lore#readme",
+  "homepage": "https://github.com/priority3/pr-atlas#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/priority3/pr-lore.git",
+    "url": "git+https://github.com/priority3/pr-atlas.git",
     "directory": "packages/connectors"
   },
   "bugs": {
-    "url": "https://github.com/priority3/pr-lore/issues"
+    "url": "https://github.com/priority3/pr-atlas/issues"
   },
   "engines": {
     "node": ">=20"
@@ -56,6 +56,6 @@
     "test": "tsx --conditions=development --test test/**/*.test.ts"
   },
   "dependencies": {
-    "@pr-lore/schema": "workspace:*"
+    "@pr-atlas/schema": "workspace:*"
   }
 }

@@ -51,36 +51,36 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    console.error(`lore: ${message}`)
+    console.error(`atlas: ${message}`)
     process.exitCode = 1
   }
 }
 
 function printHelp(): void {
-  process.stdout.write(`lore - connector-driven personal memory collection
+  process.stdout.write(`atlas - connector-driven personal memory collection
 
 Capture:
-  lore capture --url <url> [--title <title>] [--note <note>] [--tag <tag>]
-  lore capture --text <text> [--title <title>] [--note <note>]
-  lore save --file <capture.json>
+  atlas capture --url <url> [--title <title>] [--note <note>] [--tag <tag>]
+  atlas capture --text <text> [--title <title>] [--note <note>]
+  atlas save --file <capture.json>
 
 Connectors:
-  lore connector list
-  lore connector run <id> --instance <instance> [--trigger schedule] [--full]
-  lore connector run <id> --config '<json>' [--save]
-  lore config list | get <id> | set <id> --connector <id> --config '<json>' | remove <id>
+  atlas connector list
+  atlas connector run <id> --instance <instance> [--trigger schedule] [--full]
+  atlas connector run <id> --config '<json>' [--save]
+  atlas config list | get <id> | set <id> --connector <id> --config '<json>' | remove <id>
 
 Delivery:
-  lore target kinds
-  lore target list | get <id> | set <id> --kind <file|webhook> --config '<json>' | remove <id>
-  lore sync [--target <id>] [--limit <n>] [--id <capture-id>]
+  atlas target kinds
+  atlas target list | get <id> | set <id> --kind <file|webhook> --config '<json>' | remove <id>
+  atlas sync [--target <id>] [--limit <n>] [--id <capture-id>]
 
 Inspect:
-  lore status
-  lore retry [--id <capture-id>]
+  atlas status
+  atlas retry [--id <capture-id>]
 
 Global option:
-  --data-dir <path>   Store config and outbox under this directory (default ./.lore)
+  --data-dir <path>   Store config and outbox under this directory (default ./.atlas)
 
 Notes:
   Runs are incremental: a connector whose source is unchanged collects nothing.
@@ -89,9 +89,9 @@ Notes:
   target sets include_privacy_levels explicitly.
 
 priority-me-blog example:
-  lore config set priority --connector priority-me-blog \\
+  atlas config set priority --connector priority-me-blog \\
     --config '{"repository_url":"https://github.com/priority3/priority.me","site_url":"https://razet.me"}'
-  lore connector run priority-me-blog --instance priority
+  atlas connector run priority-me-blog --instance priority
 `)
 }
 

@@ -1,5 +1,5 @@
-import { DELIVERER_KINDS, DELIVERER_SCHEMAS, isDelivererKind } from '@pr-lore/core'
-import { validateJsonSchema } from '@pr-lore/schema'
+import { DELIVERER_KINDS, DELIVERER_SCHEMAS, isDelivererKind } from '@pr-atlas/core'
+import { validateJsonSchema } from '@pr-atlas/schema'
 import { option, requiredOption, type ParsedArgs } from '../inputs/args.js'
 import { ConfigStore, asJsonObject, type DeliveryTarget } from '../runtime/config.js'
 import { dataDirectory, emit } from '../runtime/io.js'

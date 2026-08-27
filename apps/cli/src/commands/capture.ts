@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { OutboxStore, createManualCapture, type ManualCaptureInput } from '@pr-lore/core'
-import { assertValidCapture, hashText, type SubjectKind } from '@pr-lore/schema'
+import { OutboxStore, createManualCapture, type ManualCaptureInput } from '@pr-atlas/core'
+import { assertValidCapture, hashText, type SubjectKind } from '@pr-atlas/schema'
 import { option, options, requiredOption, type ParsedArgs } from '../inputs/args.js'
 import { dataDirectory, emit } from '../runtime/io.js'
 

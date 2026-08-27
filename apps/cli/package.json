@@ -1,25 +1,25 @@
 {
-  "name": "@pr-lore/cli",
+  "name": "@pr-atlas/cli",
   "version": "0.2.0",
   "type": "module",
-  "description": "lore - a connector-driven personal memory collection CLI.",
+  "description": "atlas - a connector-driven personal memory collection CLI.",
   "keywords": [
-    "pr-lore",
-    "lore",
+    "pr-atlas",
+    "atlas",
     "cli",
     "connector",
     "personal-knowledge"
   ],
   "license": "MIT",
   "author": "priority3",
-  "homepage": "https://github.com/priority3/pr-lore#readme",
+  "homepage": "https://github.com/priority3/pr-atlas#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/priority3/pr-lore.git",
+    "url": "git+https://github.com/priority3/pr-atlas.git",
     "directory": "apps/cli"
   },
   "bugs": {
-    "url": "https://github.com/priority3/pr-lore/issues"
+    "url": "https://github.com/priority3/pr-atlas/issues"
   },
   "engines": {
     "node": ">=20"
@@ -29,7 +29,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "bin": {
-    "lore": "./dist/main.js"
+    "atlas": "./dist/main.js"
   },
   "files": [
     "dist",
@@ -40,11 +40,11 @@
     "build": "tsc -b",
     "typecheck": "tsc -p tsconfig.typecheck.json",
     "test": "tsx --conditions=development --test test/**/*.test.ts",
-    "lore": "tsx --conditions=development src/main.ts"
+    "atlas": "tsx --conditions=development src/main.ts"
   },
   "dependencies": {
-    "@pr-lore/connectors": "workspace:*",
-    "@pr-lore/core": "workspace:*",
-    "@pr-lore/schema": "workspace:*"
+    "@pr-atlas/connectors": "workspace:*",
+    "@pr-atlas/core": "workspace:*",
+    "@pr-atlas/schema": "workspace:*"
   }
 }

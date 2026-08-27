@@ -1,6 +1,6 @@
 import { mkdir, rename, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import type { JsonValue, LoreCapture, PrivacyLevel } from '@pr-lore/schema'
+import type { JsonValue, AtlasCapture, PrivacyLevel } from '@pr-atlas/schema'
 import type { OutboxStore } from './outbox.js'
 
 /**
@@ -14,8 +14,8 @@ export interface Deliverer {
   readonly id: string
   readonly kind: string
   /** Returns a reason to skip this capture, or null to deliver it. */
-  accepts?(capture: LoreCapture): string | null
-  deliver(capture: LoreCapture): Promise<void>
+  accepts?(capture: AtlasCapture): string | null
+  deliver(capture: AtlasCapture): Promise<void>
 }
 
 const ALL_PRIVACY_LEVELS: PrivacyLevel[] = ['public', 'private', 'sensitive']
@@ -44,7 +44,7 @@ export function createFileDeliverer(config: FileDelivererConfig, id = 'file'): D
     id,
     kind: 'file',
     accepts: gate,
-    async deliver(capture: LoreCapture): Promise<void> {
+    async deliver(capture: AtlasCapture): Promise<void> {
       await mkdir(directory, { recursive: true })
       const target = join(directory, `${capture.id}.json`)
       const temporary = `${target}.tmp`
@@ -60,10 +60,10 @@ export function createWebhookDeliverer(config: WebhookDelivererConfig, id = 'web
     id,
     kind: 'webhook',
     accepts: gate,
-    async deliver(capture: LoreCapture): Promise<void> {
+    async deliver(capture: AtlasCapture): Promise<void> {
       const headers: Record<string, string> = {
         'content-type': 'application/json',
-        'user-agent': 'pr-lore/0.2.0',
+        'user-agent': 'pr-atlas/0.2.0',
         ...config.headers,
       }
       if (config.token_env) {
@@ -206,7 +206,7 @@ export async function syncOutbox(
   return summary
 }
 
-function privacyGate(levels: PrivacyLevel[]): (capture: LoreCapture) => string | null {
+function privacyGate(levels: PrivacyLevel[]): (capture: AtlasCapture) => string | null {
   return capture =>
     levels.includes(capture.privacy.level)
       ? null

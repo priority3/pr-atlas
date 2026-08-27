@@ -1,10 +1,10 @@
 {
-  "name": "@pr-lore/core",
+  "name": "@pr-atlas/core",
   "version": "0.2.0",
   "type": "module",
-  "description": "pr-lore runtime: connector registry, directory-backed outbox, and deliverers.",
+  "description": "pr-atlas runtime: connector registry, directory-backed outbox, and deliverers.",
   "keywords": [
-    "pr-lore",
+    "pr-atlas",
     "connector",
     "outbox",
     "capture",
@@ -12,14 +12,14 @@
   ],
   "license": "MIT",
   "author": "priority3",
-  "homepage": "https://github.com/priority3/pr-lore#readme",
+  "homepage": "https://github.com/priority3/pr-atlas#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/priority3/pr-lore.git",
+    "url": "git+https://github.com/priority3/pr-atlas.git",
     "directory": "packages/core"
   },
   "bugs": {
-    "url": "https://github.com/priority3/pr-lore/issues"
+    "url": "https://github.com/priority3/pr-atlas/issues"
   },
   "engines": {
     "node": ">=20"
@@ -46,6 +46,6 @@
     "test": "tsx --conditions=development --test test/**/*.test.ts"
   },
   "dependencies": {
-    "@pr-lore/schema": "workspace:*"
+    "@pr-atlas/schema": "workspace:*"
   }
 }

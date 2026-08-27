@@ -1,5 +1,5 @@
 {
-  "name": "pr-lore",
+  "name": "pr-atlas",
   "private": true,
   "version": "0.2.0",
   "description": "A connector-driven personal memory collection runtime.",
@@ -14,7 +14,7 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "release": "bash scripts/release.sh",
-    "lore": "pnpm --silent --filter @pr-lore/cli exec tsx --conditions=development src/main.ts"
+    "atlas": "pnpm --silent --filter @pr-atlas/cli exec tsx --conditions=development src/main.ts"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

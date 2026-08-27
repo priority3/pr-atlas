@@ -6,25 +6,25 @@ import {
   type ConnectorContext,
   type ConnectorInstance,
   type ConnectorResult,
-  type LoreConnector,
-} from '@pr-lore/schema'
+  type AtlasConnector,
+} from '@pr-atlas/schema'
 
 export class ConnectorRegistry {
-  private readonly connectors = new Map<string, LoreConnector>()
+  private readonly connectors = new Map<string, AtlasConnector>()
 
-  register(connector: LoreConnector): void {
+  register(connector: AtlasConnector): void {
     const id = connector.manifest().id
     if (this.connectors.has(id)) throw new Error(`Connector already registered: ${id}`)
     this.connectors.set(id, connector)
   }
 
-  get(id: string): LoreConnector {
+  get(id: string): AtlasConnector {
     const connector = this.connectors.get(id)
     if (!connector) throw new Error(`Unknown connector: ${id}`)
     return connector
   }
 
-  list(): LoreConnector[] {
+  list(): AtlasConnector[] {
     return [...this.connectors.values()].sort((a, b) =>
       a.manifest().id.localeCompare(b.manifest().id),
     )

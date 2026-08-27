@@ -1,5 +1,5 @@
-import { OutboxStore, runConnector, type ConnectorRegistry } from '@pr-lore/core'
-import type { CaptureTrigger, ConnectorInstance } from '@pr-lore/schema'
+import { OutboxStore, runConnector, type ConnectorRegistry } from '@pr-atlas/core'
+import type { CaptureTrigger, ConnectorInstance } from '@pr-atlas/schema'
 import { hasFlag, option, requiredOption, type ParsedArgs } from '../inputs/args.js'
 import { ConfigStore, asJsonObject } from '../runtime/config.js'
 import { dataDirectory, emit } from '../runtime/io.js'

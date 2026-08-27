@@ -2,8 +2,8 @@
  * Runs `worker` over `items` with a bounded number of in-flight calls, keeping
  * the result in input order.
  *
- * Deliberately lives in `@pr-lore/connectors` rather than `@pr-lore/core`:
- * connectors depend only on `@pr-lore/schema`, and keeping that dependency edge
+ * Deliberately lives in `@pr-atlas/connectors` rather than `@pr-atlas/core`:
+ * connectors depend only on `@pr-atlas/schema`, and keeping that dependency edge
  * intact is worth more than sharing a helper this small.
  */
 export async function mapWithConcurrency<T, R>(
