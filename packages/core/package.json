@@ -1,6 +1,6 @@
 {
   "name": "@pr-atlas/core",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "pr-atlas runtime: connector registry, directory-backed outbox, and deliverers.",
   "keywords": [

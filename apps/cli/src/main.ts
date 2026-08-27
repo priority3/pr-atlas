@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-import { resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { parseArgs } from './inputs/args.js'
 import { captureCommand, saveCommand } from './commands/capture.js'
 import { configCommand } from './commands/config.js'
@@ -94,6 +91,3 @@ priority-me-blog example:
   atlas connector run priority-me-blog --instance priority
 `)
 }
-
-const entryUrl = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : null
-if (entryUrl === import.meta.url) void main()

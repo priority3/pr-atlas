@@ -1,6 +1,6 @@
 {
   "name": "@pr-atlas/schema",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "Data contract for pr-atlas: atlas.capture.v1 types, stable IDs, and a JSON Schema subset validator.",
   "keywords": [

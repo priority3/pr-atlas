@@ -290,7 +290,7 @@ pnpm rebuild    # clean + build，等价于 pnpm clean && pnpm build
 
 ```bash
 pnpm build
-node apps/cli/dist/main.js help
+node apps/cli/dist/bin.js help
 ```
 
 各包的 `exports` 同时声明两个条件：
