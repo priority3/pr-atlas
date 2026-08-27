@@ -1,8 +1,33 @@
 {
   "name": "@pr-lore/schema",
   "version": "0.2.0",
-  "private": true,
   "type": "module",
+  "description": "Data contract for pr-lore: lore.capture.v1 types, stable IDs, and a JSON Schema subset validator.",
+  "keywords": [
+    "pr-lore",
+    "capture",
+    "schema",
+    "json-schema",
+    "connector"
+  ],
+  "license": "MIT",
+  "author": "priority3",
+  "homepage": "https://github.com/priority3/pr-lore#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/priority3/pr-lore.git",
+    "directory": "packages/schema"
+  },
+  "bugs": {
+    "url": "https://github.com/priority3/pr-lore/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "exports": {
     ".": {
       "development": "./src/index.ts",
@@ -11,7 +36,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "!dist/**/*.tsbuildinfo"
   ],
   "scripts": {
     "build": "tsc -b",

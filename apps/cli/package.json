@@ -1,13 +1,40 @@
 {
   "name": "@pr-lore/cli",
   "version": "0.2.0",
-  "private": true,
   "type": "module",
+  "description": "lore - a connector-driven personal memory collection CLI.",
+  "keywords": [
+    "pr-lore",
+    "lore",
+    "cli",
+    "connector",
+    "personal-knowledge"
+  ],
+  "license": "MIT",
+  "author": "priority3",
+  "homepage": "https://github.com/priority3/pr-lore#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/priority3/pr-lore.git",
+    "directory": "apps/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/priority3/pr-lore/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "bin": {
     "lore": "./dist/main.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "!dist/**/*.tsbuildinfo"
   ],
   "scripts": {
     "build": "tsc -b",

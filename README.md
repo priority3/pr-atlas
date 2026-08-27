@@ -300,4 +300,33 @@ node apps/cli/dist/main.js help
 
 `typecheck` 用独立的 `tsconfig.typecheck.json`，通过 `customConditions: ["development"]` 直接对源码做检查（并覆盖 `src` 与 `test`），因此类型检查同样不依赖构建产物。
 
-四个包目前仍是 `private: true`。发布到 npm 是独立的决策，本次只把构建机制修正到「产物存在且可执行」。
+## 发布
+
+四个包以 MIT 许可证发布在 npmjs.org：
+
+| 包 | 用途 |
+| --- | --- |
+| [`@pr-lore/cli`](https://www.npmjs.com/package/@pr-lore/cli) | `lore` 命令，`npm i -g @pr-lore/cli` |
+| [`@pr-lore/core`](https://www.npmjs.com/package/@pr-lore/core) | registry、outbox、Deliverer |
+| [`@pr-lore/connectors`](https://www.npmjs.com/package/@pr-lore/connectors) | 内置内容源 |
+| [`@pr-lore/schema`](https://www.npmjs.com/package/@pr-lore/schema) | 数据契约，零依赖 |
+
+发布走 `scripts/release.sh`：
+
+```bash
+pnpm release --dry-run          # 走完全部检查与打包，但不发布
+pnpm release                    # 发布 package.json 里当前的版本
+pnpm release --version 0.3.0    # 先把所有包统一改成 0.3.0，提交，再发布
+pnpm release --otp 123456       # 账号开了双因子时透传验证码
+```
+
+脚本按顺序做这些事，任一步失败即停：分支必须是 main、工作区干净、与 `origin/main` 同步 → 校验 npmjs.org 登录态 → 四个包版本与根一致 → `typecheck` → `test` → 干净重建 → 校验产物齐全、bin 入口带 shebang、CLI 能脱离 tsx 运行 → 打包演练 → 按拓扑序发布 → 打 tag 并推送。
+
+两个容易踩的点已经在脚本和配置里处理掉：
+
+- 仓库 `.npmrc` 把 registry 指向 npmmirror 镜像，镜像是只读的。所以每条发布命令都显式带 `--registry https://registry.npmjs.org/`，各包也写了 `publishConfig.registry`，不依赖环境里恰好是什么源。
+- 包之间用 `workspace:*` 互相引用，`pnpm publish` 会在打包时把它改写成具体版本号。因此必须用 `pnpm publish` 而不是 `npm publish`，否则发出去的包会带着一个装不上的 `workspace:*` 依赖。
+
+`files` 里带了 `src`，这样 `dist/*.js.map` 引用的源码能被解析到，报错栈可以直接跳转；`dist/**/*.tsbuildinfo` 是增量编译缓存，用否定模式排除。
+
+重跑是安全的：`pnpm publish` 会跳过 registry 上已存在的版本，所以中途失败后直接再执行一次即可。
