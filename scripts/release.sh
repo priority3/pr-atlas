@@ -6,6 +6,10 @@
 #   scripts/release.sh                    # 发布 package.json 里当前的版本
 #   scripts/release.sh --version 0.3.0    # 先把所有包统一改成 0.3.0，提交，再发布
 #   scripts/release.sh --otp 123456       # 账号开了双因子时透传验证码
+#   scripts/release.sh --publish-only --otp 123456
+#                                         # 跳过质量门直接发布。只在刚跑过 --dry-run
+#                                         # 且全绿之后使用 —— TOTP 只有 30 秒有效期，
+#                                         # 等不到质量门跑完。
 #
 # 设计取舍：
 # - 只发 npmjs.org。仓库 .npmrc 指向 npmmirror 镜像（只读），所以每条 npm/pnpm
@@ -20,18 +24,24 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 DRY_RUN=0
+PUBLISH_ONLY=0
 NEW_VERSION=""
 OTP=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
+    --publish-only) PUBLISH_ONLY=1; shift ;;
     --version) NEW_VERSION="${2:-}"; shift 2 ;;
     --otp)     OTP="${2:-}"; shift 2 ;;
-    -h|--help) sed -n '3,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) echo "release: 未知参数 $1（可用：--dry-run / --version <x.y.z> / --otp <code>）" >&2; exit 1 ;;
+    -h|--help) sed -n '3,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "release: 未知参数 $1（可用：--dry-run / --publish-only / --version <x.y.z> / --otp <code>）" >&2; exit 1 ;;
   esac
 done
+
+[ "$DRY_RUN" = "1" ] && [ "$PUBLISH_ONLY" = "1" ] && {
+  echo "release: --dry-run 和 --publish-only 不能同时用" >&2; exit 1
+}
 
 step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 fail() { printf '\033[31mrelease: %s\033[0m\n' "$1" >&2; exit 1; }
@@ -90,14 +100,21 @@ MISMATCH="$(pnpm -r --silent exec node -p \
 [ -z "$MISMATCH" ] || fail "这些包的版本与根 package.json 的 $VERSION 不一致：$MISMATCH"
 
 # --- 4. 质量门 -----------------------------------------------------------
-step "typecheck"
-pnpm typecheck
+# Reason: --publish-only 跳过这一段，是因为 TOTP 只有 30 秒有效期，而这三步要跑
+# 半分钟左右，验证码会在用到之前就过期。产物校验（第 5 段）保留，它很便宜。
+if [ "$PUBLISH_ONLY" = "1" ]; then
+  step "跳过质量门（--publish-only）"
+  echo "沿用上一次构建的产物 —— 请确认刚跑过 --dry-run 且全绿"
+else
+  step "typecheck"
+  pnpm typecheck
 
-step "test"
-pnpm test
+  step "test"
+  pnpm test
 
-step "干净构建"
-pnpm rebuild
+  step "干净构建"
+  pnpm rebuild
+fi
 
 # --- 5. 产物校验 ---------------------------------------------------------
 step "校验构建产物"
@@ -124,8 +141,10 @@ node apps/cli/dist/main.js help >/dev/null || fail "构建产物无法运行：n
 echo "产物齐全，CLI 可独立运行"
 
 # --- 6. 打包演练 ---------------------------------------------------------
-step "打包演练（dry-run）"
-pnpm -r publish --dry-run --access public --registry "$REGISTRY" --no-git-checks
+if [ "$PUBLISH_ONLY" != "1" ]; then
+  step "打包演练（dry-run）"
+  pnpm -r publish --dry-run --access public --registry "$REGISTRY" --no-git-checks
+fi
 
 if [ "$DRY_RUN" = "1" ]; then
   printf '\n\033[32m演练完成，未发布。去掉 --dry-run 即可真正发布 %s\033[0m\n' "$TAG"

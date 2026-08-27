@@ -317,8 +317,11 @@ node apps/cli/dist/main.js help
 pnpm release --dry-run          # 走完全部检查与打包，但不发布
 pnpm release                    # 发布 package.json 里当前的版本
 pnpm release --version 0.3.0    # 先把所有包统一改成 0.3.0，提交，再发布
-pnpm release --otp 123456       # 账号开了双因子时透传验证码
+pnpm release --otp 123456       # 透传双因子验证码
+pnpm release --publish-only --otp 123456   # 跳过质量门直接发布
 ```
+
+npmjs.org 现在**强制要求发布方开启 2FA**，所以 `--otp` 基本是必需的。而 TOTP 只有 30 秒有效期，质量门（typecheck + test + 干净重建）要跑半分钟左右，验证码往往在用到之前就过期了。所以实际发布分两步：先 `pnpm release --dry-run` 确认全绿，再取一个新验证码跑 `pnpm release --publish-only --otp <码>`。`--publish-only` 只跳过质量门，仓库状态、登录态、版本一致性和产物校验照常执行。
 
 脚本按顺序做这些事，任一步失败即停：分支必须是 main、工作区干净、与 `origin/main` 同步 → 校验 npmjs.org 登录态 → 四个包版本与根一致 → `typecheck` → `test` → 干净重建 → 校验产物齐全、bin 入口带 shebang、CLI 能脱离 tsx 运行 → 打包演练 → 按拓扑序发布 → 打 tag 并推送。
 
