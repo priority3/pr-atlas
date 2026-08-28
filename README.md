@@ -311,25 +311,43 @@ node apps/cli/dist/bin.js help
 | [`@pr-atlas/connectors`](https://www.npmjs.com/package/@pr-atlas/connectors) | 内置内容源 |
 | [`@pr-atlas/schema`](https://www.npmjs.com/package/@pr-atlas/schema) | 数据契约，零依赖 |
 
-发布走 `scripts/release.sh`：
+发布由 [Changesets](https://changesets.dev) 驱动，在 GitHub Actions 里通过 npm 的 [Trusted Publishing](https://docs.npmjs.com/trusted-publishers) 完成 —— 不需要 npm token，也不需要在本地过双因子。
+
+日常流程只有两步：
 
 ```bash
-pnpm release --dry-run          # 走完全部检查与打包，但不发布
-pnpm release                    # 发布 package.json 里当前的版本
-pnpm release --version 0.3.0    # 先把所有包统一改成 0.3.0，提交，再发布
-pnpm release --otp 123456       # 透传双因子验证码
-pnpm release --publish-only --otp 123456   # 跳过质量门直接发布
+pnpm changeset          # 描述这次改动影响哪些包、是 major/minor/patch
+git commit && git push  # 推到 main
 ```
 
-npmjs.org 现在**强制要求发布方开启 2FA**，所以 `--otp` 基本是必需的。而 TOTP 只有 30 秒有效期，质量门（typecheck + test + 干净重建）要跑半分钟左右，验证码往往在用到之前就过期了。所以实际发布分两步：先 `pnpm release --dry-run` 确认全绿，再取一个新验证码跑 `pnpm release --publish-only --otp <码>`。`--publish-only` 只跳过质量门，仓库状态、登录态、版本一致性和产物校验照常执行。
+之后 `.github/workflows/publish.yml` 接管：有待发布的 changeset 时开一个 "Version Packages" PR；合并该 PR 后自动构建、校验、打包、发布，并创建 GitHub Release。
 
-脚本按顺序做这些事，任一步失败即停：分支必须是 main、工作区干净、与 `origin/main` 同步 → 校验 npmjs.org 登录态 → 四个包版本与根一致 → `typecheck` → `test` → 干净重建 → 校验产物齐全、bin 入口带 shebang、CLI 能脱离 tsx 运行 → 打包演练 → 按拓扑序发布 → 打 tag 并推送。
+四个包在 `.changeset/config.json` 里配了 `fixed`，始终锁步同一个版本号。
 
-两个容易踩的点已经在脚本和配置里处理掉：
+### 为什么 publish 单独一个 job
+
+workflow 拆成 `select-mode` → `version` / `pack` → `publish` 四个 job，`id-token: write` **只加在 publish 上**。这是 changesets 官方比 npm 自己的示例更严的一条建议：OIDC 令牌能换取发布权限，构建和测试阶段不该碰得到它。
+
+### 产物校验
+
+`pack` job 在打包前会跑 `scripts/verify-artifacts.sh`，本地也可以 `pnpm verify`。它检查产物齐全、bin 带 shebang、CLI 能脱离 tsx 运行，以及**把 bin 链接到临时目录再执行**。
+
+最后这一条是 0.2.0 的教训：那个版本发出去的 CLI 装上后完全不能用（无输出、退出码 0），而 typecheck、82 个测试、打包演练当时全是绿的。原因是 `main.ts` 用 `process.argv[1] === import.meta.url` 判断自己是不是入口模块，而 npm 把 bin 装成 `node_modules/.bin/atlas` 符号链接，两个路径永不相等。直接跑 `dist/main.js` 恰好相等，所以本地和 CI 都测不出来。现在 bin 独立成 `src/bin.ts` 无条件执行，校验也改走符号链接这条真实路径。
+
+### 手动兜底
+
+`scripts/release.sh` 保留为 CI 不可用时的手动路径：
+
+```bash
+pnpm release --dry-run    # 走完全部检查与打包，不发布
+pnpm release              # 真正发布
+```
+
+它与 CI 共用同一份 `verify-artifacts.sh`。注意手动发布会撞上 npm 的双因子要求：账号若用通行密钥，需要在交互式终端里跑（浏览器弹窗确认）；若用 TOTP，可以 `--otp <码>` 透传，并用 `--publish-only` 跳过质量门以避开验证码的 30 秒时限。
+
+### 两个容易踩的点
 
 - 仓库 `.npmrc` 把 registry 指向 npmmirror 镜像，镜像是只读的。所以每条发布命令都显式带 `--registry https://registry.npmjs.org/`，各包也写了 `publishConfig.registry`，不依赖环境里恰好是什么源。
-- 包之间用 `workspace:*` 互相引用，`pnpm publish` 会在打包时把它改写成具体版本号。因此必须用 `pnpm publish` 而不是 `npm publish`，否则发出去的包会带着一个装不上的 `workspace:*` 依赖。
+- 包之间用 `workspace:*` 互相引用，改写成具体版本号这件事由 pnpm 在打包时完成。Changesets 检测到 pnpm 后会用 pnpm 发布，并刻意不去改写 `workspace:*` 范围，把它留给 pnpm —— 分工是设计好的。
 
 `files` 里带了 `src`，这样 `dist/*.js.map` 引用的源码能被解析到，报错栈可以直接跳转；`dist/**/*.tsbuildinfo` 是增量编译缓存，用否定模式排除。
-
-重跑是安全的：`pnpm publish` 会跳过 registry 上已存在的版本，所以中途失败后直接再执行一次即可。

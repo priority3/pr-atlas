@@ -119,45 +119,8 @@ fi
 # --- 5. 产物校验 ---------------------------------------------------------
 step "校验构建产物"
 
-for f in \
-  packages/schema/dist/index.js \
-  packages/core/dist/index.js \
-  packages/connectors/dist/index.js \
-  packages/connectors/dist/generic-web/index.js \
-  packages/connectors/dist/priority-me-blog/index.js \
-  apps/cli/dist/main.js \
-  apps/cli/dist/bin.js
-do
-  [ -f "$f" ] || fail "缺少构建产物：$f"
-done
-
-# bin 路径从 package.json 读，避免脚本和清单各写一份而漂移
-BIN_REL="$(node -p "require('./apps/cli/package.json').bin.atlas")"
-BIN_PATH="apps/cli/${BIN_REL#./}"
-[ -f "$BIN_PATH" ] || fail "package.json 声明的 bin 不存在：$BIN_PATH"
-
-# Reason: bin 入口丢了 shebang 的话，npm i -g 之后 `atlas` 会被 shell 当脚本执行而报错，
-# 而这在本地用 node 直接跑是发现不了的。
-head -1 "$BIN_PATH" | grep -q '^#!/usr/bin/env node' \
-  || fail "$BIN_PATH 缺少 shebang，bin 入口会不可执行"
-
-# 产物必须能脱离 tsx 独立运行
-node "$BIN_PATH" help >/dev/null || fail "构建产物无法运行：node $BIN_PATH help"
-
-# Reason: 这一条是 0.2.0 的教训。npm 安装后 `atlas` 是 node_modules/.bin 下指向 dist 的
-# 符号链接，此时 process.argv[1] 是链接路径、import.meta.url 是解析后的真实路径。当时
-# main.ts 用「两者相等」判断自己是否为入口，于是 main() 永不执行，`atlas` 静默退出 0。
-# 直接跑真实文件两者恰好相等，所以测不出来 —— 必须走一遍符号链接才能复现真实安装路径。
-LINK_DIR="$(mktemp -d)"
-ln -s "$ROOT/$BIN_PATH" "$LINK_DIR/atlas"
-node "$LINK_DIR/atlas" help > "$LINK_DIR/out.txt" 2>&1 || true
-if [ ! -s "$LINK_DIR/out.txt" ]; then
-  rm -rf "$LINK_DIR"
-  fail "经 bin 符号链接调用时无输出，入口不会执行（npm 安装后 \`atlas\` 会是个空操作）"
-fi
-rm -rf "$LINK_DIR"
-
-echo "产物齐全，CLI 可独立运行，符号链接调用正常"
+# 与 CI 共用同一份校验，避免两处各写一遍而漂移
+bash "$ROOT/scripts/verify-artifacts.sh" || fail "产物校验未通过"
 
 # --- 6. 打包演练 ---------------------------------------------------------
 if [ "$PUBLISH_ONLY" != "1" ]; then

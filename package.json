@@ -13,10 +13,12 @@
     "rebuild": "pnpm clean && pnpm build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
+    "verify": "bash scripts/verify-artifacts.sh",
     "release": "bash scripts/release.sh",
     "atlas": "pnpm --silent --filter @pr-atlas/cli exec tsx --conditions=development src/bin.ts"
   },
   "devDependencies": {
+    "@changesets/cli": "^3.0.1",
     "@types/node": "^22.15.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.3"

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@4.0.0/schema.json",
+  "baseBranch": "main",
+  "access": "public",
+  "ignore": [],
+  "fixed": [["@pr-atlas/*"]],
+  "linked": [],
+  "format": "auto",
+  "updateInternalDependencies": "patch",
+  "commit": false,
+  "changelog": "@changesets/cli/changelog"
+}
